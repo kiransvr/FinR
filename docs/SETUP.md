@@ -49,6 +49,48 @@ mvn spring-boot:run
 
 Flyway migration `V1__create_borrowers_table.sql` runs on startup.
 
+## S1-02 Migration Validation
+
+Use this sequence to validate that Flyway runs on Spring Boot startup.
+
+1. Start PostgreSQL:
+
+```bash
+docker compose -f db/docker-compose.yml up -d
+```
+
+2. If Maven is installed locally, run:
+
+```bash
+cd backend
+mvn -Dtest=FlywayStartupValidationTest test
+```
+
+3. If Maven is not installed locally, run the same test via Dockerized Maven:
+
+```bash
+docker run --rm \
+	--add-host host.docker.internal:host-gateway \
+	-e DB_URL=jdbc:postgresql://host.docker.internal:5432/fing \
+	-e DB_USERNAME=fing \
+	-e DB_PASSWORD=fing \
+	-v ${PWD}/backend:/workspace \
+	-w /workspace \
+	maven:3.9.9-eclipse-temurin-21 \
+	mvn -Dtest=FlywayStartupValidationTest test
+```
+
+Alternative one-command execution from repository root:
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/validate-s1-02.ps1
+```
+
+Expected result:
+- Spring context starts.
+- Flyway applies migration `V1__create_borrowers_table.sql`.
+- Test `FlywayStartupValidationTest` passes.
+
 ## Backend Profiles
 
 - Default profile: `local`

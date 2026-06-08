@@ -2,3 +2,6 @@
 # Build output
 backend/target/
 
+# Local editor state
+.vscode/
+
