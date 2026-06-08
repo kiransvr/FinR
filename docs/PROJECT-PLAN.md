@@ -79,6 +79,7 @@ Exit criteria:
 - No critical/high vulnerabilities before release branch.
 - API contract backward compatibility checks enforced.
 - Flyway migration review for all schema changes.
+- Protected branch requires passing GitHub Actions checks defined in `.github/workflows/`.
 
 ## 7. Definition of Ready (DoR)
 
