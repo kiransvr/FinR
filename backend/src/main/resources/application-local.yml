@@ -1,0 +1,8 @@
+spring:
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.fing.backend: INFO
+    org.springframework.web: INFO

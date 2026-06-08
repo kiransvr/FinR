@@ -1,6 +1,8 @@
 spring:
   application:
     name: fing-backend
+  profiles:
+    default: local
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/fing}
     username: ${DB_USERNAME:fing}

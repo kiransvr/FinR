@@ -67,6 +67,31 @@ Recommended package flow:
 - domain (business rules, aggregates, value objects)
 - infrastructure (repositories, messaging, external adapters)
 
+### Backend Package Conventions and Naming Standard
+
+- `com.fing.backend.api.controller`: REST controllers only
+- `com.fing.backend.api.dto`: request and response DTOs only
+- `com.fing.backend.api.exception`: API-facing exception translation only
+- `com.fing.backend.application.service`: use-case orchestration services only
+- `com.fing.backend.domain.model`: domain entities and value objects
+- `com.fing.backend.domain.port`: repository and external service contracts owned by domain/application
+- `com.fing.backend.infrastructure.persistence`: repository adapters and persistence mapping logic
+- `com.fing.backend.infrastructure.persistence.entity`: JPA entities only
+- `com.fing.backend.infrastructure.persistence.jpa`: Spring Data repositories only
+
+Naming rules:
+- Controllers end with `Controller`
+- Application services end with `Service`
+- Domain repository contracts end with `Repository`
+- Infrastructure adapters use a technology-specific prefix or suffix such as `PostgresBorrowerRepository`
+- DTO classes use request/response suffixes such as `CreateBorrowerRequest` and `BorrowerResponse`
+
+Review rules:
+- `api` may depend on `application` and DTOs, but not directly on persistence adapters
+- `application` may depend on `domain` and domain ports, but not on web concerns
+- `domain` must stay framework-agnostic and must not carry Spring stereotypes
+- `infrastructure` implements ports and may depend on framework libraries
+
 Dependency rule:
 - Outer layers depend on inner abstractions; domain does not depend on frameworks.
 

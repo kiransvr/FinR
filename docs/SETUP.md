@@ -48,3 +48,14 @@ mvn spring-boot:run
 ```
 
 Flyway migration `V1__create_borrowers_table.sql` runs on startup.
+
+## Backend Profiles
+
+- Default profile: `local`
+- Override profile with `SPRING_PROFILES_ACTIVE`
+
+Example:
+
+```bash
+SPRING_PROFILES_ACTIVE=local mvn spring-boot:run
+```
