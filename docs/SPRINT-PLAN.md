@@ -41,6 +41,9 @@ Planned outcomes:
 Goals:
 - Loan onboarding and linkage to borrower.
 
+Current mode:
+- Planning-only (no development execution) until budget and approval are granted.
+
 Planned outcomes:
 - Loan create/view APIs.
 - Outstanding and status calculations.
@@ -102,3 +105,5 @@ Planned outcomes:
 ## Detailed Sprint Backlogs
 
 - Sprint 1 detailed backlog: docs/SPRINT-1-BACKLOG.md
+- Sprint 2 detailed backlog: docs/SPRINT-2-BACKLOG.md
+- Sprint 3 detailed backlog: docs/SPRINT-3-BACKLOG.md

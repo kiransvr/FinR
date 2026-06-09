@@ -40,11 +40,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
       - name: Build, test, and verify
@@ -52,6 +52,64 @@ jobs:
 
       - name: Lint with Checkstyle
         run: mvn --batch-mode checkstyle:check
+
+      - name: Upload backend test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-surefire-reports
+          path: backend/target/surefire-reports/**
+
+  borrower-api-test-pack:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fing
+          POSTGRES_USER: fing
+          POSTGRES_PASSWORD: fing
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U fing -d fing"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DB_URL: jdbc:postgresql://localhost:5432/fing
+      DB_USERNAME: fing
+      DB_PASSWORD: fing
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Run borrower API contract and integration test pack
+        run: >-
+          mvn --batch-mode
+          -Dtest=BorrowerControllerCrudContractTest,BorrowerControllerErrorContractTest,BorrowerApiIntegrationTest
+          test
+
+      - name: Upload borrower API test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: borrower-api-test-pack-reports
+          path: backend/target/surefire-reports/**
 
   frontend-build-test:
     runs-on: ubuntu-latest

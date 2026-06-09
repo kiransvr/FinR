@@ -51,6 +51,18 @@ FinG/
 
 Project planning started.
 
+## Borrower API
+
+- `POST /api/v1/borrowers` creates a borrower.
+- `PUT /api/v1/borrowers/{borrowerId}` updates `fullName`, `phoneNumber`, and `status`.
+- `GET /api/v1/borrowers/{borrowerId}` returns borrower detail including lifecycle status.
+- `GET /api/v1/borrowers?id=&phoneNumber=&fullName=&page=&size=` searches borrowers with paging defaults `page=0`, `size=20`, max `size=100`, and case-insensitive prefix matching on `fullName`.
+
+Response schema notes:
+
+- Borrower payload fields: `id`, `fullName`, `phoneNumber`, `status`, `createdAt`, `updatedAt`.
+- Search payload fields: `items`, `page`, `size`, `totalElements`, `totalPages`.
+
 ## Architecture Reference
 
 - See /docs/ARCHITECTURE.md for the MVC 3-tier blueprint and implementation guidance.

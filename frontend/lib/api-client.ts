@@ -3,6 +3,29 @@ import { appConfig } from "@/lib/config";
 type RequestInterceptor = (input: RequestInfo | URL, init: RequestInit) => Promise<[RequestInfo | URL, RequestInit]> | [RequestInfo | URL, RequestInit];
 type ResponseInterceptor = (response: Response) => Promise<Response> | Response;
 
+type ApiValidationError = {
+  field: string;
+  message: string;
+};
+
+type ApiErrorPayload = {
+  status: number;
+  message: string;
+  validationErrors?: ApiValidationError[];
+};
+
+export class ApiClientError extends Error {
+  status: number;
+  validationErrors: ApiValidationError[];
+
+  constructor(status: number, message: string, validationErrors: ApiValidationError[] = []) {
+    super(message);
+    this.name = "ApiClientError";
+    this.status = status;
+    this.validationErrors = validationErrors;
+  }
+}
+
 class ApiClient {
   private requestInterceptors: RequestInterceptor[] = [];
   private responseInterceptors: ResponseInterceptor[] = [];
@@ -20,7 +43,8 @@ class ApiClient {
 
     this.useResponse(async (response) => {
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        const payload = await this.parseErrorResponse(response);
+        throw new ApiClientError(response.status, payload.message, payload.validationErrors ?? []);
       }
       return response;
     });
@@ -45,6 +69,13 @@ class ApiClient {
     });
   }
 
+  async put<T>(path: string, body: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: "PUT",
+      body: JSON.stringify(body)
+    });
+  }
+
   private async request<T>(path: string, init: RequestInit): Promise<T> {
     let input: RequestInfo | URL = `${this.baseUrl}${path}`;
     let requestInit = init;
@@ -60,6 +91,23 @@ class ApiClient {
     }
 
     return response.json() as Promise<T>;
+  }
+
+  private async parseErrorResponse(response: Response): Promise<ApiErrorPayload> {
+    try {
+      const payload = (await response.json()) as Partial<ApiErrorPayload>;
+      return {
+        status: response.status,
+        message: payload.message ?? `API request failed with status ${response.status}`,
+        validationErrors: payload.validationErrors ?? []
+      };
+    } catch {
+      return {
+        status: response.status,
+        message: `API request failed with status ${response.status}`,
+        validationErrors: []
+      };
+    }
   }
 }
 

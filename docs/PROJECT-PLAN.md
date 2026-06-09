@@ -34,6 +34,9 @@ Exit criteria:
 - Overdue and Recovery workflows.
 - Notification engine and core dashboards.
 
+Current constraint note:
+- Sprint 3 is in planning-only mode until budget and development approval are granted.
+
 Exit criteria:
 - MVP feature set complete.
 - UAT-ready build with test evidence.

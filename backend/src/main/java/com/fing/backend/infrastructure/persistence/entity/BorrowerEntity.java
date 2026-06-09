@@ -1,7 +1,10 @@
 package com.fing.backend.infrastructure.persistence.entity;
 
+import com.fing.backend.domain.model.BorrowerStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
@@ -22,18 +25,28 @@ public class BorrowerEntity {
     @Column(name = "phone_number", nullable = false, length = 20)
     private String phoneNumber;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private BorrowerStatus status;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
 
     protected BorrowerEntity() {
         // Required by JPA.
     }
 
-    public BorrowerEntity(UUID id, String fullName, String phoneNumber, Instant createdAt) {
+    public BorrowerEntity(UUID id, String fullName, String phoneNumber, BorrowerStatus status,
+                          Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.fullName = fullName;
         this.phoneNumber = phoneNumber;
+        this.status = status;
         this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public UUID getId() {
@@ -48,7 +61,15 @@ public class BorrowerEntity {
         return phoneNumber;
     }
 
+    public BorrowerStatus getStatus() {
+        return status;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
     }
 }

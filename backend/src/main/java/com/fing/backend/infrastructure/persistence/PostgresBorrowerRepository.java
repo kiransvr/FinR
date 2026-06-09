@@ -4,6 +4,9 @@ import com.fing.backend.domain.model.Borrower;
 import com.fing.backend.domain.port.BorrowerRepository;
 import com.fing.backend.infrastructure.persistence.entity.BorrowerEntity;
 import com.fing.backend.infrastructure.persistence.jpa.SpringDataBorrowerJpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
@@ -30,12 +33,31 @@ public class PostgresBorrowerRepository implements BorrowerRepository {
         return jpaRepository.findById(id).map(this::toDomain);
     }
 
+    @Override
+    public Page<Borrower> search(Optional<UUID> id, Optional<String> phoneNumber,
+                                 Optional<String> fullName, int page, int size) {
+        Specification<BorrowerEntity> spec = Specification.where(null);
+        if (id.isPresent()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("id"), id.get()));
+        }
+        if (phoneNumber.isPresent()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("phoneNumber"), phoneNumber.get()));
+        }
+        if (fullName.isPresent()) {
+            String pattern = fullName.get().trim().toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("fullName")), pattern));
+        }
+        return jpaRepository.findAll(spec, PageRequest.of(page, size)).map(this::toDomain);
+    }
+
     private BorrowerEntity toEntity(Borrower borrower) {
         return new BorrowerEntity(
                 borrower.getId(),
                 borrower.getFullName(),
                 borrower.getPhoneNumber(),
-                borrower.getCreatedAt()
+                borrower.getStatus(),
+                borrower.getCreatedAt(),
+                borrower.getUpdatedAt()
         );
     }
 
@@ -44,7 +66,10 @@ public class PostgresBorrowerRepository implements BorrowerRepository {
                 entity.getId(),
                 entity.getFullName(),
                 entity.getPhoneNumber(),
-                entity.getCreatedAt()
+                entity.getStatus(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
         );
     }
 }
+
