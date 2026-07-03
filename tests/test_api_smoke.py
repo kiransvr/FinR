@@ -343,3 +343,34 @@ def test_job_stats_endpoint_returns_counts() -> None:
     payload = response.json()
     assert payload["status"] == "success"
     assert isinstance(payload["counts"]["total"], int)
+
+
+def test_pipeline_async_submission_is_deduplicated_by_default() -> None:
+    admin_token = _login("admin", "changeme")
+    first = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert first.status_code == 202
+
+    second = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert second.status_code == 202
+    assert first.json()["job_id"] == second.json()["job_id"]
+
+
+def test_pipeline_async_force_submission_creates_new_job() -> None:
+    admin_token = _login("admin", "changeme")
+    first = client.post(
+        "/api/v1/jobs/pipeline/run?force=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    second = client.post(
+        "/api/v1/jobs/pipeline/run?force=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.json()["job_id"] != second.json()["job_id"]

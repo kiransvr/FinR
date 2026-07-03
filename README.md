@@ -73,6 +73,11 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs?status=queued&limit=50` (admin) to list recent jobs for triage
 - `GET /api/v1/jobs/stats` (admin) to inspect queue backlog and status distribution
 
+Async submit deduplication:
+
+- `POST /api/v1/jobs/pipeline/run` and `POST /api/v1/jobs/feedback/refresh-plan` reuse an existing active (`queued` or `running`) job of the same type by default.
+- Add `?force=true` to enqueue a new job even when an active one exists.
+
 Auth security endpoints:
 
 - `POST /api/v1/auth/logout` revokes current bearer token

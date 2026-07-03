@@ -303,3 +303,16 @@ def test_get_job_stats_returns_counts(tmp_path: Path) -> None:
 
     oldest = stats["oldest"]
     assert oldest["queued"] is not None
+
+
+def test_submit_deduplicated_reuses_active_job(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("dedupe_job", lambda _: {"ok": True})
+
+    first, first_created = service.submit_deduplicated("dedupe_job", payload={})
+    second, second_created = service.submit_deduplicated("dedupe_job", payload={})
+
+    assert first_created is True
+    assert second_created is False
+    assert first.job_id == second.job_id

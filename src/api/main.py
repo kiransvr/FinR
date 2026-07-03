@@ -354,11 +354,19 @@ def run_pipeline(
 
 @app.post("/api/v1/jobs/pipeline/run", response_model=JobSubmitResponse, status_code=202, tags=["Jobs"])
 def run_pipeline_async(
+    force: bool = Query(default=False),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
-    require_role(current_user.role, "admin")
-    state = jobs.submit(job_type="pipeline_run", payload={})
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    if force:
+        state = jobs.submit(job_type="pipeline_run", payload={})
+    else:
+        state, _ = jobs.submit_deduplicated(job_type="pipeline_run", payload={})
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,
@@ -374,11 +382,19 @@ def run_pipeline_async(
     tags=["Jobs"],
 )
 def refresh_plan_async(
+    force: bool = Query(default=False),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
-    require_role(current_user.role, "admin")
-    state = jobs.submit(job_type="refresh_plan", payload={})
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    if force:
+        state = jobs.submit(job_type="refresh_plan", payload={})
+    else:
+        state, _ = jobs.submit_deduplicated(job_type="refresh_plan", payload={})
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,

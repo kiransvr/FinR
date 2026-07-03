@@ -109,6 +109,39 @@ class JobService:
             timeout_seconds=resolved_timeout_seconds,
         )
 
+    def submit_deduplicated(
+        self,
+        job_type: str,
+        payload: dict | None = None,
+        max_attempts: int | None = None,
+        timeout_seconds: float | None = None,
+    ) -> tuple[JobState, bool]:
+        if job_type not in self._handlers:
+            raise ValueError(f"No handler registered for job_type '{job_type}'")
+
+        with self._lock:
+            with self._connect() as conn:
+                existing = conn.execute(
+                    """
+                    SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
+                    FROM job_queue
+                    WHERE job_type = ?
+                      AND status IN ('queued', 'running')
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (job_type,),
+                ).fetchone()
+                if existing is not None:
+                    return self._row_to_state(existing), False
+
+        return self.submit(
+            job_type=job_type,
+            payload=payload,
+            max_attempts=max_attempts,
+            timeout_seconds=timeout_seconds,
+        ), True
+
     def get(self, job_id: str) -> JobState | None:
         with self._connect() as conn:
             row = conn.execute(
