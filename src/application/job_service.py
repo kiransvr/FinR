@@ -123,19 +123,34 @@ class JobService:
         if row is None:
             return None
 
-        result: dict | None = json.loads(row[3]) if row[3] else None
-        return JobState(
-            job_id=row[0],
-            job_type=row[1],
-            status=row[2],
-            attempts=int(row[7]),
-            max_attempts=int(row[8]),
-            timeout_seconds=float(row[9]),
-            result=result,
-            error=row[4],
-            created_at=row[5],
-            updated_at=row[6],
-        )
+        return self._row_to_state(row)
+
+    def list_jobs(self, status_filter: str | None = None, limit: int = 50) -> list[JobState]:
+        capped_limit = max(1, min(200, int(limit)))
+        with self._connect() as conn:
+            if status_filter:
+                rows = conn.execute(
+                    """
+                    SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
+                    FROM job_queue
+                    WHERE status = ?
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (status_filter.strip().lower(), capped_limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
+                    FROM job_queue
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (capped_limit,),
+                ).fetchall()
+
+        return [self._row_to_state(row) for row in rows]
 
     def requeue_dead_letter(self, job_id: str) -> JobState | None:
         with self._lock:
@@ -406,6 +421,22 @@ class JobService:
         conn = sqlite3.connect(self._db_path)
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
+
+    @staticmethod
+    def _row_to_state(row: tuple) -> JobState:
+        result: dict | None = json.loads(row[3]) if row[3] else None
+        return JobState(
+            job_id=row[0],
+            job_type=row[1],
+            status=row[2],
+            attempts=int(row[7]),
+            max_attempts=int(row[8]),
+            timeout_seconds=float(row[9]),
+            result=result,
+            error=row[4],
+            created_at=row[5],
+            updated_at=row[6],
+        )
 
     @staticmethod
     def _utc_now() -> str:

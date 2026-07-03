@@ -130,6 +130,11 @@ class JobStatusResponse(BaseModel):
     error: str | None = None
 
 
+class JobListResponse(BaseModel):
+    total: int
+    records: list[JobStatusResponse]
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

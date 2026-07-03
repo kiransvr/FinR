@@ -247,3 +247,37 @@ def test_recover_stale_running_job_dead_letters_when_attempts_exhausted(tmp_path
     state = service.get(submitted.job_id)
     assert state is not None
     assert state.status == "dead_letter"
+
+
+def test_list_jobs_filters_by_status(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("list_job", lambda _: {"ok": True})
+
+    first = service.submit("list_job", payload={})
+    second = service.submit("list_job", payload={})
+    canceled = service.cancel_queued_job(first.job_id)
+
+    assert canceled is not None
+    assert canceled.status == "canceled"
+
+    queued_jobs = service.list_jobs(status_filter="queued", limit=20)
+    canceled_jobs = service.list_jobs(status_filter="canceled", limit=20)
+
+    assert any(job.job_id == second.job_id for job in queued_jobs)
+    assert all(job.status == "queued" for job in queued_jobs)
+    assert len(canceled_jobs) == 1
+    assert canceled_jobs[0].job_id == first.job_id
+
+
+def test_list_jobs_respects_limit(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("list_job", lambda _: {"ok": True})
+
+    service.submit("list_job", payload={})
+    service.submit("list_job", payload={})
+    service.submit("list_job", payload={})
+
+    limited = service.list_jobs(limit=2)
+    assert len(limited) == 2

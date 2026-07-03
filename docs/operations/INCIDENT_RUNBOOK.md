@@ -51,6 +51,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - If an async job was submitted in error and still queued, cancel it via `POST /api/v1/jobs/{job_id}/cancel`.
 - If queue growth is impacting storage or triage clarity, purge old terminal jobs via `POST /api/v1/jobs/cleanup?older_than_seconds=86400`.
 - If worker interruption left jobs stuck in `running`, recover them via `POST /api/v1/jobs/recover-stale?stale_after_seconds=300`.
+- Use `GET /api/v1/jobs?status=queued&limit=50` to inspect queue health and choose next recovery action.
 
 ## Recovery Verification
 

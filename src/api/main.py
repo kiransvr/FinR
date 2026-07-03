@@ -41,6 +41,7 @@ from src.api.schemas import (
     PlanRefreshResponse,
     JobSubmitResponse,
     JobStatusResponse,
+    JobListResponse,
     JobCleanupResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
@@ -380,6 +381,34 @@ def refresh_plan_async(
         status=state.status,
         created_at=state.created_at,
     )
+
+
+@app.get("/api/v1/jobs", response_model=JobListResponse, tags=["Jobs"])
+def list_jobs(
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    states = jobs.list_jobs(status_filter=status_filter, limit=limit)
+    records = [
+        JobStatusResponse(
+            job_id=state.job_id,
+            job_type=state.job_type,
+            status=state.status,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
+            result=state.result,
+            error=state.error,
+        )
+        for state in states
+    ]
+    return JobListResponse(total=len(records), records=records)
 
 
 @app.get("/api/v1/jobs/{job_id}", response_model=JobStatusResponse, tags=["Jobs"])

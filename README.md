@@ -70,6 +70,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/{job_id}/cancel` (admin) to cancel queued jobs
 - `POST /api/v1/jobs/cleanup?older_than_seconds=86400` (admin) to purge terminal jobs from durable queue
 - `POST /api/v1/jobs/recover-stale?stale_after_seconds=300` (admin) to recover stale `running` jobs
+- `GET /api/v1/jobs?status=queued&limit=50` (admin) to list recent jobs for triage
 
 Auth security endpoints:
 

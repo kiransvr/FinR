@@ -295,3 +295,30 @@ def test_recover_stale_endpoint_returns_recovered_count() -> None:
     payload = response.json()
     assert payload["status"] == "success"
     assert isinstance(payload["deleted_count"], int)
+
+
+def test_list_jobs_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs?limit=10",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_list_jobs_endpoint_returns_records() -> None:
+    admin_token = _login("admin", "changeme")
+    submit = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+
+    response = client.get(
+        "/api/v1/jobs?status=queued&limit=20",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload["total"], int)
+    assert isinstance(payload["records"], list)
