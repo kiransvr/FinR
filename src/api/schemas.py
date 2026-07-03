@@ -102,3 +102,20 @@ class PipelineRunResponse(BaseModel):
     top_risky_accounts: Optional[int] = None
     visit_plan_rows: Optional[int] = None
     officer_kpi_rows: Optional[int] = None
+
+
+class JobSubmitResponse(BaseModel):
+    job_id: str
+    job_type: str
+    status: str
+    created_at: str
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    job_type: str
+    status: str
+    created_at: str
+    updated_at: str
+    result: dict | None = None
+    error: str | None = None

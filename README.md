@@ -55,6 +55,12 @@ Runtime entry points:
 - `python run_api.py` to serve the FastAPI API
 - `streamlit run app.py` to open the dashboard
 
+Background job endpoints (admin):
+
+- `POST /api/v1/jobs/pipeline/run` to execute full pipeline asynchronously
+- `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
+- `GET /api/v1/jobs/{job_id}` to check job status and result
+
 In the dashboard, use the sidebar upload control to replace the active input file and run the pipeline from the UI.
 
 ## Security configuration

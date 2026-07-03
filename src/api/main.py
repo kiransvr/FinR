@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 
 from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
+from src.application.job_service import JobService
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
@@ -36,6 +37,8 @@ from src.api.schemas import (
     FeedbackSubmissionResponse,
     FeedbackListResponse,
     PlanRefreshResponse,
+    JobSubmitResponse,
+    JobStatusResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
 
@@ -44,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 _risk_service = build_risk_service(BASE_DIR)
+_job_service = JobService(max_workers=2)
 _login_rate_limiter = SlidingWindowRateLimiter(
     limit=int(os.getenv("LOGIN_RATE_LIMIT", "30")),
     window_seconds=int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "60")),
@@ -52,6 +56,10 @@ _login_rate_limiter = SlidingWindowRateLimiter(
 
 def get_risk_service() -> RiskService:
     return _risk_service
+
+
+def get_job_service() -> JobService:
+    return _job_service
 
 
 def _raise_not_found(exc: NotFoundError) -> None:
@@ -299,3 +307,66 @@ def run_pipeline(
     except Exception as exc:
         logger.exception("Pipeline run failed")
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/v1/jobs/pipeline/run", response_model=JobSubmitResponse, status_code=202, tags=["Jobs"])
+def run_pipeline_async(
+    current_user: TokenData = Depends(get_current_user),
+    service: RiskService = Depends(get_risk_service),
+    jobs: JobService = Depends(get_job_service),
+):
+    require_role(current_user.role, "admin")
+    state = jobs.submit(
+        job_type="pipeline_run",
+        runner=lambda: service.run_pipeline().__dict__,
+    )
+    return JobSubmitResponse(
+        job_id=state.job_id,
+        job_type=state.job_type,
+        status=state.status,
+        created_at=state.created_at,
+    )
+
+
+@app.post(
+    "/api/v1/jobs/feedback/refresh-plan",
+    response_model=JobSubmitResponse,
+    status_code=202,
+    tags=["Jobs"],
+)
+def refresh_plan_async(
+    current_user: TokenData = Depends(get_current_user),
+    service: RiskService = Depends(get_risk_service),
+    jobs: JobService = Depends(get_job_service),
+):
+    require_role(current_user.role, "admin")
+    state = jobs.submit(
+        job_type="refresh_plan",
+        runner=lambda: service.refresh_plan_from_feedback().__dict__,
+    )
+    return JobSubmitResponse(
+        job_id=state.job_id,
+        job_type=state.job_type,
+        status=state.status,
+        created_at=state.created_at,
+    )
+
+
+@app.get("/api/v1/jobs/{job_id}", response_model=JobStatusResponse, tags=["Jobs"])
+def get_job_status(
+    job_id: str,
+    _: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    state = jobs.get(job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    return JobStatusResponse(
+        job_id=state.job_id,
+        job_type=state.job_type,
+        status=state.status,
+        created_at=state.created_at,
+        updated_at=state.updated_at,
+        result=state.result,
+        error=state.error,
+    )

@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import time
 
 from src.api.main import app
 from src.api.observability import REQUEST_ID_HEADER
@@ -93,3 +94,49 @@ def test_admin_endpoint_allows_admin_role() -> None:
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code in (200, 404)
+
+
+def test_async_pipeline_job_submission_and_status() -> None:
+    admin_token = _login("admin", "changeme")
+    submit = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+    payload = submit.json()
+    assert payload["job_type"] == "pipeline_run"
+    job_id = payload["job_id"]
+
+    status_payload = {}
+    for _ in range(20):
+        status = client.get(
+            f"/api/v1/jobs/{job_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert status.status_code == 200
+        status_payload = status.json()
+        if status_payload["status"] in {"succeeded", "failed"}:
+            break
+        time.sleep(0.05)
+
+    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
+
+
+def test_async_refresh_job_submission_and_status() -> None:
+    admin_token = _login("admin", "changeme")
+    submit = client.post(
+        "/api/v1/jobs/feedback/refresh-plan",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+    payload = submit.json()
+    assert payload["job_type"] == "refresh_plan"
+    job_id = payload["job_id"]
+
+    status = client.get(
+        f"/api/v1/jobs/{job_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert status.status_code == 200
+    status_payload = status.json()
+    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
