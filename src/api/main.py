@@ -50,6 +50,7 @@ from src.api.schemas import (
     JobStatsOldest,
     JobCleanupResponse,
     JobActionCountResponse,
+    JobDrainStatusResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
 
@@ -477,6 +478,29 @@ def get_job_stats(
             running=oldest["running"],
             dead_letter=oldest["dead_letter"],
         ),
+    )
+
+
+@app.get("/api/v1/jobs/drain-status", response_model=JobDrainStatusResponse, tags=["Jobs"])
+def get_job_drain_status(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    drain = jobs.get_drain_status()
+    typed_drain = cast(dict[str, object], drain)
+    running_count = cast(int, typed_drain["running"])
+    queued_count = cast(int, typed_drain["queued"])
+    return JobDrainStatusResponse(
+        status="success",
+        paused=bool(typed_drain["paused"]),
+        running=running_count,
+        queued=queued_count,
+        drained=bool(typed_drain["drained"]),
     )
 
 

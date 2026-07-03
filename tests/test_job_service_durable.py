@@ -424,3 +424,24 @@ def test_cancel_queued_jobs_filters_by_job_type(tmp_path: Path) -> None:
     b_state = service.get(b.job_id)
     assert a_state is not None and a_state.status == "canceled"
     assert b_state is not None and b_state.status == "queued"
+
+
+def test_get_drain_status_reflects_pause_and_running_state(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+
+    def _slow(_: dict) -> dict:
+        time.sleep(0.2)
+        return {"ok": True}
+
+    service.register_handler("drain_job", _slow)
+    service.start_worker()
+    service.submit("drain_job", payload={})
+
+    time.sleep(0.02)
+    service.pause_processing()
+    status = service.get_drain_status()
+    assert status["paused"] is True
+    assert isinstance(status["running"], int)
+    assert isinstance(status["queued"], int)
+    assert isinstance(status["drained"], bool)

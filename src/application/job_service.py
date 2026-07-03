@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite3
 from threading import Event, Lock, Thread
 import time
-from typing import Callable
+from typing import Callable, cast
 from uuid import uuid4
 
 
@@ -273,6 +273,19 @@ class JobService:
                 "running": oldest.get("running"),
                 "dead_letter": oldest.get("dead_letter"),
             },
+        }
+
+    def get_drain_status(self) -> dict[str, object]:
+        stats = self.get_job_stats()
+        counts = cast(dict[str, int], stats["counts"])
+        running = int(counts["running"])
+        queued = int(counts["queued"])
+        paused = bool(stats["paused"])
+        return {
+            "paused": paused,
+            "running": running,
+            "queued": queued,
+            "drained": paused and running == 0,
         }
 
     def requeue_dead_letter(self, job_id: str) -> JobState | None:

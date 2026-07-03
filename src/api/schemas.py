@@ -167,3 +167,11 @@ class JobActionCountResponse(BaseModel):
     status: str
     message: str
     affected_count: int
+
+
+class JobDrainStatusResponse(BaseModel):
+    status: str
+    paused: bool
+    running: int
+    queued: int
+    drained: bool
