@@ -52,3 +52,30 @@ def test_request_id_header_is_returned() -> None:
     response = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: request_id})
     assert response.status_code == 200
     assert response.headers.get(REQUEST_ID_HEADER) == request_id
+
+
+def _login(username: str, password: str) -> str:
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"username": username, "password": password},
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+def test_admin_endpoint_blocks_officer_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/pipeline/run",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_admin_endpoint_allows_admin_role() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/feedback/refresh-plan",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code in (200, 404)
