@@ -1,6 +1,0 @@
-CREATE TABLE IF NOT EXISTS borrowers (
-    id UUID PRIMARY KEY,
-    full_name VARCHAR(150) NOT NULL,
-    phone_number VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL
-);

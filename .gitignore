@@ -1,14 +1,5 @@
-
-# Build output
-backend/target/
-
-# Local editor state
-.vscode/
-
-# Node.js dependencies
-node_modules/
-frontend/node_modules/
-
-# Next.js build cache
-frontend/.next/
-
+# Keep this repository clean before import
+.venv/
+__pycache__/
+*.pyc
+.env
