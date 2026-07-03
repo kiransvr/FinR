@@ -49,6 +49,7 @@ from src.api.schemas import (
     JobStatsCounts,
     JobStatsOldest,
     JobCleanupResponse,
+    JobActionCountResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
 
@@ -583,6 +584,24 @@ def cancel_queued_job(
         result=state.result,
         error=state.error,
     )
+
+
+@app.post("/api/v1/jobs/cancel-queued", response_model=JobActionCountResponse, tags=["Jobs"])
+def cancel_queued_jobs(
+    job_type: str | None = Query(default=None),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    affected = jobs.cancel_queued_jobs(job_type=job_type)
+    message = "Queued jobs canceled."
+    if job_type:
+        message = f"Queued jobs canceled for job_type '{job_type}'."
+    return JobActionCountResponse(status="success", message=message, affected_count=affected)
 
 
 @app.post("/api/v1/jobs/cleanup", response_model=JobCleanupResponse, tags=["Jobs"])

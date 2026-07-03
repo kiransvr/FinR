@@ -389,3 +389,38 @@ def test_submit_raises_when_processing_paused(tmp_path: Path) -> None:
         assert False, "Expected ProcessingPausedError"
     except ProcessingPausedError:
         pass
+
+
+def test_cancel_queued_jobs_cancels_all_queued(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("bulk_job", lambda _: {"ok": True})
+
+    first = service.submit("bulk_job", payload={})
+    second = service.submit("bulk_job", payload={})
+
+    affected = service.cancel_queued_jobs()
+    assert affected >= 2
+
+    first_state = service.get(first.job_id)
+    second_state = service.get(second.job_id)
+    assert first_state is not None and first_state.status == "canceled"
+    assert second_state is not None and second_state.status == "canceled"
+
+
+def test_cancel_queued_jobs_filters_by_job_type(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("bulk_a", lambda _: {"ok": True})
+    service.register_handler("bulk_b", lambda _: {"ok": True})
+
+    a = service.submit("bulk_a", payload={})
+    b = service.submit("bulk_b", payload={})
+
+    affected = service.cancel_queued_jobs(job_type="bulk_a")
+    assert affected == 1
+
+    a_state = service.get(a.job_id)
+    b_state = service.get(b.job_id)
+    assert a_state is not None and a_state.status == "canceled"
+    assert b_state is not None and b_state.status == "queued"

@@ -340,6 +340,31 @@ class JobService:
 
         return self.get(job_id)
 
+    def cancel_queued_jobs(self, job_type: str | None = None) -> int:
+        now = self._utc_now()
+        with self._lock:
+            with self._connect() as conn:
+                if job_type:
+                    cursor = conn.execute(
+                        """
+                        UPDATE job_queue
+                        SET status = ?, next_attempt_at = NULL, updated_at = ?
+                        WHERE status = 'queued' AND job_type = ?
+                        """,
+                        ("canceled", now, job_type),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        UPDATE job_queue
+                        SET status = ?, next_attempt_at = NULL, updated_at = ?
+                        WHERE status = 'queued'
+                        """,
+                        ("canceled", now),
+                    )
+
+        return max(0, int(cursor.rowcount))
+
     def cleanup_terminal_jobs(self, older_than_seconds: float = 86400.0) -> int:
         cutoff_seconds = max(0.0, older_than_seconds)
         cutoff = self._utc_now_plus_seconds(-cutoff_seconds)

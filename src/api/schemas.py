@@ -161,3 +161,9 @@ class JobCleanupResponse(BaseModel):
     status: str
     message: str
     deleted_count: int
+
+
+class JobActionCountResponse(BaseModel):
+    status: str
+    message: str
+    affected_count: int

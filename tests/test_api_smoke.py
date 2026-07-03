@@ -468,3 +468,35 @@ def test_async_submit_returns_423_when_processing_paused() -> None:
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resume.status_code == 200
+
+
+def test_bulk_cancel_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/cancel-queued",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_bulk_cancel_endpoint_returns_affected_count() -> None:
+    admin_token = _login("admin", "changeme")
+    first = client.post(
+        "/api/v1/jobs/pipeline/run?force=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    second = client.post(
+        "/api/v1/jobs/feedback/refresh-plan?force=true",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert first.status_code in {202, 429, 423}
+    assert second.status_code in {202, 429, 423}
+
+    response = client.post(
+        "/api/v1/jobs/cancel-queued",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["affected_count"], int)
