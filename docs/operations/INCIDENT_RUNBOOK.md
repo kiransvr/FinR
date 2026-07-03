@@ -54,6 +54,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs?status=queued&limit=50` to inspect queue health and choose next recovery action.
 - Use `GET /api/v1/jobs/stats` to quickly assess backlog size and concentration of `dead_letter` failures.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
+- During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 
 ## Recovery Verification
 

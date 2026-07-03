@@ -64,7 +64,6 @@ _job_service = JobService(
 )
 _job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
 _job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)
-_job_service.start_worker()
 _login_rate_limiter = SlidingWindowRateLimiter(
     limit=int(os.getenv("LOGIN_RATE_LIMIT", "30")),
     window_seconds=int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "60")),
@@ -92,7 +91,11 @@ def _get_cors_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     enforce_runtime_settings()
-    yield
+    _job_service.start_worker()
+    try:
+        yield
+    finally:
+        _job_service.stop_worker()
 
 app = FastAPI(
     title="Loan Default Risk",

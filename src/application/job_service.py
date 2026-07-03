@@ -55,10 +55,18 @@ class JobService:
         self._handlers[job_type] = runner
 
     def start_worker(self) -> None:
+        self._stop_event.clear()
         if self._worker and self._worker.is_alive():
             return
         self._worker = Thread(target=self._worker_loop, name="risk-job-worker", daemon=True)
         self._worker.start()
+
+    def stop_worker(self, join_timeout_seconds: float = 2.0) -> None:
+        self._stop_event.set()
+        if self._worker and self._worker.is_alive():
+            self._worker.join(timeout=max(0.1, join_timeout_seconds))
+        self._worker = None
+        self._runner_executor.shutdown(wait=False, cancel_futures=True)
 
     def submit(
         self,

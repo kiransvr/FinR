@@ -78,6 +78,10 @@ Async submit deduplication:
 - `POST /api/v1/jobs/pipeline/run` and `POST /api/v1/jobs/feedback/refresh-plan` reuse an existing active (`queued` or `running`) job of the same type by default.
 - Add `?force=true` to enqueue a new job even when an active one exists.
 
+Worker lifecycle reliability:
+
+- Background job worker now starts on API startup and stops gracefully on API shutdown to avoid orphan processing threads during restart/deploy.
+
 Auth security endpoints:
 
 - `POST /api/v1/auth/logout` revokes current bearer token

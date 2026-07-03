@@ -316,3 +316,18 @@ def test_submit_deduplicated_reuses_active_job(tmp_path: Path) -> None:
     assert first_created is True
     assert second_created is False
     assert first.job_id == second.job_id
+
+
+def test_stop_worker_prevents_further_processing(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("stop_job", lambda _: {"ok": True})
+    service.start_worker()
+    service.stop_worker()
+
+    submitted = service.submit("stop_job", payload={})
+    time.sleep(0.05)
+
+    state = service.get(submitted.job_id)
+    assert state is not None
+    assert state.status == "queued"
