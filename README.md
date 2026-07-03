@@ -94,6 +94,7 @@ The API supports environment-driven security settings:
 - `JOB_QUEUE_DB_PATH`: optional durable job queue SQLite path. Defaults to `outputs/job_queue.db`.
 - `JOB_MAX_ATTEMPTS`: max retry attempts per background job before dead-letter (default `3`).
 - `JOB_RETRY_BACKOFF_SECONDS`: linear retry backoff base seconds (default `0.2`).
+- `JOB_TIMEOUT_SECONDS`: per-job execution timeout before retry/dead-letter handling (default `60`).
 
 Operational docs:
 

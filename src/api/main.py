@@ -53,6 +53,7 @@ _job_service = JobService(
     db_path=Path(os.getenv("JOB_QUEUE_DB_PATH", (BASE_DIR / "outputs" / "job_queue.db").as_posix())),
     max_attempts=int(os.getenv("JOB_MAX_ATTEMPTS", "3")),
     retry_backoff_seconds=float(os.getenv("JOB_RETRY_BACKOFF_SECONDS", "0.2")),
+    default_timeout_seconds=float(os.getenv("JOB_TIMEOUT_SECONDS", "60")),
 )
 _job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
 _job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)

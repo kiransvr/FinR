@@ -65,3 +65,37 @@ def test_job_retries_then_moves_to_dead_letter(tmp_path: Path) -> None:
     assert final.attempts == 2
     assert final.max_attempts == 2
     assert "boom" in (final.error or "")
+
+
+def test_job_timeout_moves_to_dead_letter_when_single_attempt(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+
+    service = JobService(
+        db_path=db_path,
+        poll_interval_seconds=0.01,
+        max_attempts=1,
+        retry_backoff_seconds=0.01,
+        default_timeout_seconds=0.01,
+    )
+
+    def _slow(_: dict) -> dict:
+        time.sleep(0.1)
+        return {"done": True}
+
+    service.register_handler("slow_job", _slow)
+    service.start_worker()
+
+    submitted = service.submit("slow_job", payload={})
+
+    final = None
+    for _ in range(300):
+        current = service.get(submitted.job_id)
+        assert current is not None
+        if current.status == "dead_letter":
+            final = current
+            break
+        time.sleep(0.01)
+
+    assert final is not None
+    assert final.status == "dead_letter"
+    assert "timed out" in (final.error or "").lower()

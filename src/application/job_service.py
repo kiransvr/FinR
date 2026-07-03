@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
@@ -20,6 +21,7 @@ class JobState:
     updated_at: str
     attempts: int = 0
     max_attempts: int = 0
+    timeout_seconds: float = 0.0
     result: dict | None = None
     error: str | None = None
 
@@ -33,12 +35,15 @@ class JobService:
         poll_interval_seconds: float = 0.2,
         max_attempts: int = 3,
         retry_backoff_seconds: float = 0.2,
+        default_timeout_seconds: float = 60.0,
     ):
         self._db_path = db_path
         self._poll_interval_seconds = poll_interval_seconds
         self._default_max_attempts = max(1, max_attempts)
         self._retry_backoff_seconds = max(0.0, retry_backoff_seconds)
+        self._default_timeout_seconds = max(0.01, default_timeout_seconds)
         self._handlers: dict[str, Callable[[dict], dict]] = {}
+        self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
         self._lock = Lock()
         self._stop_event = Event()
         self._worker: Thread | None = None
@@ -53,7 +58,13 @@ class JobService:
         self._worker = Thread(target=self._worker_loop, name="risk-job-worker", daemon=True)
         self._worker.start()
 
-    def submit(self, job_type: str, payload: dict | None = None, max_attempts: int | None = None) -> JobState:
+    def submit(
+        self,
+        job_type: str,
+        payload: dict | None = None,
+        max_attempts: int | None = None,
+        timeout_seconds: float | None = None,
+    ) -> JobState:
         if job_type not in self._handlers:
             raise ValueError(f"No handler registered for job_type '{job_type}'")
 
@@ -61,16 +72,28 @@ class JobService:
         job_id = str(uuid4())
         payload_json = json.dumps(payload or {})
         resolved_max_attempts = max(1, max_attempts or self._default_max_attempts)
+        resolved_timeout_seconds = max(0.01, timeout_seconds or self._default_timeout_seconds)
         with self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO job_queue(
                     job_id, job_type, status, payload_json, result_json, error,
-                    attempts, max_attempts, next_attempt_at, created_at, updated_at
+                    attempts, max_attempts, timeout_seconds, next_attempt_at, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)
                 """,
-                (job_id, job_type, "queued", payload_json, 0, resolved_max_attempts, now, now, now),
+                (
+                    job_id,
+                    job_type,
+                    "queued",
+                    payload_json,
+                    0,
+                    resolved_max_attempts,
+                    resolved_timeout_seconds,
+                    now,
+                    now,
+                    now,
+                ),
             )
 
         return JobState(
@@ -81,13 +104,14 @@ class JobService:
             updated_at=now,
             attempts=0,
             max_attempts=resolved_max_attempts,
+            timeout_seconds=resolved_timeout_seconds,
         )
 
     def get(self, job_id: str) -> JobState | None:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts
+                SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
                 FROM job_queue
                 WHERE job_id = ?
                 """,
@@ -104,6 +128,7 @@ class JobService:
             status=row[2],
             attempts=int(row[7]),
             max_attempts=int(row[8]),
+            timeout_seconds=float(row[9]),
             result=result,
             error=row[4],
             created_at=row[5],
@@ -117,7 +142,7 @@ class JobService:
                 time.sleep(self._poll_interval_seconds)
                 continue
 
-            job_id, job_type, payload_json, attempts, max_attempts = claimed
+            job_id, job_type, payload_json, attempts, max_attempts, timeout_seconds = claimed
             runner = self._handlers.get(job_type)
             if runner is None:
                 self._finish_failed(
@@ -130,18 +155,18 @@ class JobService:
 
             payload: dict = json.loads(payload_json) if payload_json else {}
             try:
-                result = runner(payload)
+                result = self._execute_with_timeout(runner, payload, timeout_seconds)
                 self._finish_succeeded(job_id, result)
             except Exception as exc:  # pragma: no cover - defensive guard
                 self._finish_failed(job_id, error=str(exc), attempts=attempts, max_attempts=max_attempts)
 
-    def _claim_next_queued_job(self) -> tuple[str, str, str, int, int] | None:
+    def _claim_next_queued_job(self) -> tuple[str, str, str, int, int, float] | None:
         now = self._utc_now()
         with self._lock:
             with self._connect() as conn:
                 row = conn.execute(
                     """
-                    SELECT job_id, job_type, payload_json, attempts, max_attempts
+                    SELECT job_id, job_type, payload_json, attempts, max_attempts, timeout_seconds
                     FROM job_queue
                     WHERE status = 'queued'
                       AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
@@ -163,7 +188,7 @@ class JobService:
                     ("running", next_attempt_number, now, row[0]),
                 )
 
-            return row[0], row[1], row[2] or "{}", next_attempt_number, int(row[4])
+            return row[0], row[1], row[2] or "{}", next_attempt_number, int(row[4]), float(row[5])
 
     def _finish_succeeded(self, job_id: str, result: dict) -> None:
         with self._connect() as conn:
@@ -215,6 +240,7 @@ class JobService:
                     error TEXT,
                     attempts INTEGER NOT NULL DEFAULT 0,
                     max_attempts INTEGER NOT NULL DEFAULT 3,
+                    timeout_seconds REAL NOT NULL DEFAULT 60,
                     next_attempt_at TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL
@@ -226,8 +252,17 @@ class JobService:
                 conn.execute("ALTER TABLE job_queue ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
             if "max_attempts" not in columns:
                 conn.execute("ALTER TABLE job_queue ADD COLUMN max_attempts INTEGER NOT NULL DEFAULT 3")
+            if "timeout_seconds" not in columns:
+                conn.execute("ALTER TABLE job_queue ADD COLUMN timeout_seconds REAL NOT NULL DEFAULT 60")
             if "next_attempt_at" not in columns:
                 conn.execute("ALTER TABLE job_queue ADD COLUMN next_attempt_at TEXT")
+
+    def _execute_with_timeout(self, runner: Callable[[dict], dict], payload: dict, timeout_seconds: float) -> dict:
+        future = self._runner_executor.submit(runner, payload)
+        try:
+            return future.result(timeout=max(0.01, timeout_seconds))
+        except FutureTimeoutError as exc:
+            raise TimeoutError(f"Job timed out after {timeout_seconds:.2f}s") from exc
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self._db_path)
