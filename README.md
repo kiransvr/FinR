@@ -55,6 +55,12 @@ Runtime entry points:
 - `python run_api.py` to serve the FastAPI API
 - `streamlit run app.py` to open the dashboard
 
+Container entry points:
+
+- `docker build -t loan-default-risk:local .`
+- `docker run --rm -p 8001:8001 --env APP_ENV=production --env SECRET_KEY=<secret> --env ADMIN_PASSWORD=<password> loan-default-risk:local`
+- `docker compose -f docker-compose.release.yml up -d api-blue --build`
+
 Background job endpoints (admin):
 
 - `POST /api/v1/jobs/pipeline/run` to execute full pipeline asynchronously
@@ -91,6 +97,7 @@ Operational docs:
 - `docs/operations/SECURITY_CONFIGURATION_CHECKLIST.md`
 - `docs/operations/INCIDENT_RUNBOOK.md`
 - `docs/operations/RELEASE_CHECKLIST.md`
+- `docs/operations/DEPLOYMENT_STRATEGY.md`
 
 API governance docs:
 

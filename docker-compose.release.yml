@@ -1,0 +1,46 @@
+services:
+  api-blue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: loan-default-risk:blue
+    container_name: loan-default-risk-blue
+    environment:
+      APP_ENV: production
+      OUTPUT_STORE_ADAPTER: db
+      DB_OUTPUT_DATABASE_URL: sqlite:////app/outputs/output_store.db
+      SECRET_KEY: ${SECRET_KEY}
+      AUTH_KEY_VERSION: ${AUTH_KEY_VERSION:-v1}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:8501}
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  api-green:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: loan-default-risk:green
+    container_name: loan-default-risk-green
+    environment:
+      APP_ENV: production
+      OUTPUT_STORE_ADAPTER: db
+      DB_OUTPUT_DATABASE_URL: sqlite:////app/outputs/output_store.db
+      SECRET_KEY: ${SECRET_KEY}
+      AUTH_KEY_VERSION: ${AUTH_KEY_VERSION:-v1}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:8501}
+    ports:
+      - "8002:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/v1/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

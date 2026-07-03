@@ -21,6 +21,11 @@
 - [ ] Input data source for pipeline release run is validated.
 - [ ] Expected output files generated and sanity-checked.
 
+5. Deployment Strategy Readiness
+- [ ] Blue/green target slot identified (`api-blue` or `api-green`).
+- [ ] Candidate slot passes `/api/v1/health/live` and `/api/v1/health/ready`.
+- [ ] Candidate slot passes smoke checks before traffic cutover.
+
 ## Release Execution
 
 1. Tag and deploy approved commit.
@@ -35,6 +40,7 @@
 - [ ] Error rate and latency are within expected range.
 - [ ] No abnormal 401/403/429 spikes.
 - [ ] Request IDs appear in logs for sampled requests.
+- [ ] `/api/v1/metrics` reflects expected traffic and error profile.
 
 ## Rollback Criteria
 
