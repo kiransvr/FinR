@@ -16,6 +16,17 @@ def test_health_endpoint_returns_ok_payload() -> None:
     assert "pipeline_outputs_available" in payload
 
 
+def test_liveness_and_readiness_endpoints() -> None:
+    live_response = client.get("/api/v1/health/live")
+    assert live_response.status_code == 200
+    assert live_response.json()["status"] == "alive"
+
+    ready_response = client.get("/api/v1/health/ready")
+    assert ready_response.status_code == 200
+    ready_payload = ready_response.json()
+    assert ready_payload["status"] == "ok"
+
+
 def test_login_returns_bearer_token_for_admin() -> None:
     response = client.post(
         "/api/v1/auth/login",
@@ -31,6 +42,9 @@ def test_login_returns_bearer_token_for_admin() -> None:
 def test_protected_endpoint_requires_token() -> None:
     response = client.get("/api/v1/scored-accounts")
     assert response.status_code == 401
+    payload = response.json()
+    assert payload["error"]["code"] == "HTTP_401"
+    assert "message" in payload["error"]
 
 
 def test_protected_endpoint_allows_authenticated_call() -> None:

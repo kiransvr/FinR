@@ -21,10 +21,23 @@ class TokenResponse(BaseModel):
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
+class LivenessResponse(BaseModel):
+    status: str
+
 class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     pipeline_outputs_available: bool
+
+
+class ApiErrorBody(BaseModel):
+    code: str
+    message: str
+    request_id: str | None = None
+
+
+class ApiErrorResponse(BaseModel):
+    error: ApiErrorBody
 
 
 # ── Outputs ───────────────────────────────────────────────────────────────────

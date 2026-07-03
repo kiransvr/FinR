@@ -3,12 +3,14 @@ Loan Default Risk API — FastAPI application.
 """
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import logging
 import os
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
@@ -17,9 +19,17 @@ from src.api.auth import (
     TokenData,
     authenticate_user, create_access_token, get_current_user,
 )
+from src.api.guardrails import enforce_runtime_settings
 from src.api.observability import install_observability_middleware
+from src.api.observability import REQUEST_ID_HEADER
+from src.api.rate_limit import SlidingWindowRateLimiter
 from src.api.schemas import (
-    HealthResponse, LoginRequest as SchemaLoginRequest, TokenResponse,
+    ApiErrorBody,
+    ApiErrorResponse,
+    HealthResponse,
+    LivenessResponse,
+    LoginRequest as SchemaLoginRequest,
+    TokenResponse,
     ScoredAccountsResponse, VisitPlanResponse, OfficerKPIResponse,
     PipelineRunResponse,
     FeedbackSubmissionRequest,
@@ -34,6 +44,10 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 _risk_service = build_risk_service(BASE_DIR)
+_login_rate_limiter = SlidingWindowRateLimiter(
+    limit=int(os.getenv("LOGIN_RATE_LIMIT", "30")),
+    window_seconds=int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "60")),
+)
 
 
 def get_risk_service() -> RiskService:
@@ -49,10 +63,17 @@ def _get_cors_origins() -> list[str]:
     origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
     return origins or ["http://localhost:3000", "http://localhost:8501"]
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    enforce_runtime_settings()
+    yield
+
 app = FastAPI(
     title="Loan Default Risk",
     description="Collection operations, risk scoring, and visit planning for field officers.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 _cors_origins = _get_cors_origins()
@@ -66,10 +87,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 install_observability_middleware(app)
+
+
+def _build_error_response(
+    status_code: int,
+    code: str,
+    message: str,
+    request: Request,
+) -> JSONResponse:
+    request_id = request.headers.get(REQUEST_ID_HEADER)
+    payload = ApiErrorResponse(
+        error=ApiErrorBody(code=code, message=message, request_id=request_id)
+    )
+    return JSONResponse(status_code=status_code, content=payload.model_dump())
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    message = str(exc.detail) if exc.detail is not None else "Request failed"
+    return _build_error_response(
+        status_code=exc.status_code,
+        code=f"HTTP_{exc.status_code}",
+        message=message,
+        request=request,
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled server error", exc_info=exc)
+    return _build_error_response(
+        status_code=500,
+        code="INTERNAL_SERVER_ERROR",
+        message="Internal server error",
+        request=request,
+    )
+
+
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["Auth"])
-def login(body: SchemaLoginRequest):
+def login(body: SchemaLoginRequest, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    rate_key = f"{client_ip}:{body.username.lower()}"
+    if not _login_rate_limiter.allow(rate_key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Try again later.",
+        )
+
     user = authenticate_user(body.username, body.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -79,14 +145,23 @@ def login(body: SchemaLoginRequest):
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
-@app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
-def health(service: RiskService = Depends(get_risk_service)):
+@app.get("/api/v1/health/live", response_model=LivenessResponse, tags=["Health"])
+def live_health():
+    return LivenessResponse(status="alive")
+
+
+@app.get("/api/v1/health/ready", response_model=HealthResponse, tags=["Health"])
+def ready_health(service: RiskService = Depends(get_risk_service)):
     health_status = service.get_health()
     return HealthResponse(
         status=health_status.status,
         model_loaded=health_status.model_loaded,
         pipeline_outputs_available=health_status.pipeline_outputs_available,
     )
+
+@app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
+def health(service: RiskService = Depends(get_risk_service)):
+    return ready_health(service)
 
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
