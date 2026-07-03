@@ -274,3 +274,24 @@ def test_cleanup_endpoint_returns_deleted_count() -> None:
     payload = cleanup.json()
     assert payload["status"] == "success"
     assert isinstance(payload["deleted_count"], int)
+
+
+def test_recover_stale_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/recover-stale?stale_after_seconds=1",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_recover_stale_endpoint_returns_recovered_count() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/recover-stale?stale_after_seconds=1",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["deleted_count"], int)

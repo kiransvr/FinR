@@ -69,6 +69,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/{job_id}/requeue` (admin) to requeue dead-letter jobs
 - `POST /api/v1/jobs/{job_id}/cancel` (admin) to cancel queued jobs
 - `POST /api/v1/jobs/cleanup?older_than_seconds=86400` (admin) to purge terminal jobs from durable queue
+- `POST /api/v1/jobs/recover-stale?stale_after_seconds=300` (admin) to recover stale `running` jobs
 
 Auth security endpoints:
 
@@ -98,6 +99,7 @@ The API supports environment-driven security settings:
 - `JOB_MAX_ATTEMPTS`: max retry attempts per background job before dead-letter (default `3`).
 - `JOB_RETRY_BACKOFF_SECONDS`: linear retry backoff base seconds (default `0.2`).
 - `JOB_TIMEOUT_SECONDS`: per-job execution timeout before retry/dead-letter handling (default `60`).
+- `JOB_RUNNING_STALE_SECONDS`: threshold for auto-recovering stale `running` jobs in worker loop (default `300`).
 
 Operational docs:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+import sqlite3
 
 from src.application.job_service import JobService
 
@@ -195,3 +196,54 @@ def test_cleanup_does_not_remove_active_jobs(tmp_path: Path) -> None:
 
     assert deleted == 0
     assert service.get(submitted.job_id) is not None
+
+
+def test_recover_stale_running_job_requeues_when_attempts_remain(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=3)
+    service.register_handler("stale_job", lambda _: {"ok": True})
+
+    submitted = service.submit("stale_job", payload={})
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET status = 'running', attempts = 1, updated_at = '2000-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (submitted.job_id,),
+        )
+
+    recovered = service.recover_stale_running_jobs(stale_after_seconds=1)
+    assert recovered == 1
+
+    state = service.get(submitted.job_id)
+    assert state is not None
+    assert state.status == "queued"
+    assert "Recovered stale running job" in (state.error or "")
+
+
+def test_recover_stale_running_job_dead_letters_when_attempts_exhausted(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=2)
+    service.register_handler("stale_job", lambda _: {"ok": True})
+
+    submitted = service.submit("stale_job", payload={})
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET status = 'running', attempts = 2, max_attempts = 2, updated_at = '2000-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (submitted.job_id,),
+        )
+
+    recovered = service.recover_stale_running_jobs(stale_after_seconds=1)
+    assert recovered == 1
+
+    state = service.get(submitted.job_id)
+    assert state is not None
+    assert state.status == "dead_letter"

@@ -36,12 +36,14 @@ class JobService:
         max_attempts: int = 3,
         retry_backoff_seconds: float = 0.2,
         default_timeout_seconds: float = 60.0,
+        running_stale_seconds: float = 300.0,
     ):
         self._db_path = db_path
         self._poll_interval_seconds = poll_interval_seconds
         self._default_max_attempts = max(1, max_attempts)
         self._retry_backoff_seconds = max(0.0, retry_backoff_seconds)
         self._default_timeout_seconds = max(0.01, default_timeout_seconds)
+        self._running_stale_seconds = max(1.0, running_stale_seconds)
         self._handlers: dict[str, Callable[[dict], dict]] = {}
         self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
         self._lock = Lock()
@@ -215,8 +217,64 @@ class JobService:
                 )
                 return max(0, int(cursor.rowcount))
 
+    def recover_stale_running_jobs(self, stale_after_seconds: float | None = None) -> int:
+        stale_seconds = max(1.0, stale_after_seconds or self._running_stale_seconds)
+        cutoff = self._utc_now_plus_seconds(-stale_seconds)
+        now = self._utc_now()
+        recovered = 0
+
+        with self._lock:
+            with self._connect() as conn:
+                stale_rows = conn.execute(
+                    """
+                    SELECT job_id, attempts, max_attempts
+                    FROM job_queue
+                    WHERE status = 'running'
+                      AND updated_at <= ?
+                    """,
+                    (cutoff,),
+                ).fetchall()
+
+                for row in stale_rows:
+                    job_id = str(row[0])
+                    attempts = int(row[1])
+                    max_attempts = int(row[2])
+                    if attempts < max_attempts:
+                        conn.execute(
+                            """
+                            UPDATE job_queue
+                            SET status = ?, error = ?, next_attempt_at = ?, updated_at = ?
+                            WHERE job_id = ?
+                            """,
+                            (
+                                "queued",
+                                "Recovered stale running job; requeued",
+                                now,
+                                now,
+                                job_id,
+                            ),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            UPDATE job_queue
+                            SET status = ?, error = ?, next_attempt_at = NULL, updated_at = ?
+                            WHERE job_id = ?
+                            """,
+                            (
+                                "dead_letter",
+                                "Recovered stale running job exceeded max attempts",
+                                now,
+                                job_id,
+                            ),
+                        )
+                    recovered += 1
+
+        return recovered
+
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
+            self.recover_stale_running_jobs()
             claimed = self._claim_next_queued_job()
             if not claimed:
                 time.sleep(self._poll_interval_seconds)

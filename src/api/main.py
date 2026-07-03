@@ -55,6 +55,7 @@ _job_service = JobService(
     max_attempts=int(os.getenv("JOB_MAX_ATTEMPTS", "3")),
     retry_backoff_seconds=float(os.getenv("JOB_RETRY_BACKOFF_SECONDS", "0.2")),
     default_timeout_seconds=float(os.getenv("JOB_TIMEOUT_SECONDS", "60")),
+    running_stale_seconds=float(os.getenv("JOB_RUNNING_STALE_SECONDS", "300")),
 )
 _job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
 _job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)
@@ -474,4 +475,23 @@ def cleanup_terminal_jobs(
         status="success",
         message="Terminal jobs cleanup completed.",
         deleted_count=deleted_count,
+    )
+
+
+@app.post("/api/v1/jobs/recover-stale", response_model=JobCleanupResponse, tags=["Jobs"])
+def recover_stale_running_jobs(
+    stale_after_seconds: float = Query(default=300.0, ge=1.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    recovered_count = jobs.recover_stale_running_jobs(stale_after_seconds=stale_after_seconds)
+    return JobCleanupResponse(
+        status="success",
+        message="Stale running job recovery completed.",
+        deleted_count=recovered_count,
     )
