@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.application.contracts import FeedbackSubmission
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
@@ -76,7 +77,12 @@ def login(body: SchemaLoginRequest):
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
 def health(service: RiskService = Depends(get_risk_service)):
-    return HealthResponse(**service.get_health())
+    health_status = service.get_health()
+    return HealthResponse(
+        status=health_status.status,
+        model_loaded=health_status.model_loaded,
+        pipeline_outputs_available=health_status.pipeline_outputs_available,
+    )
 
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
@@ -88,8 +94,8 @@ def scored_accounts(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        total, records = service.get_scored_accounts(limit)
-        return ScoredAccountsResponse(total=total, records=records)
+        page = service.get_scored_accounts(limit)
+        return ScoredAccountsResponse(total=page.total, records=page.records)
     except NotFoundError as exc:
         _raise_not_found(exc)
 
@@ -101,8 +107,8 @@ def top_risky(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        total, records = service.get_top_risky(limit)
-        return ScoredAccountsResponse(total=total, records=records)
+        page = service.get_top_risky(limit)
+        return ScoredAccountsResponse(total=page.total, records=page.records)
     except NotFoundError as exc:
         _raise_not_found(exc)
 
@@ -113,8 +119,8 @@ def visit_plan(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        total, records = service.get_visit_plan()
-        return VisitPlanResponse(total=total, records=records)
+        page = service.get_visit_plan()
+        return VisitPlanResponse(total=page.total, records=page.records)
     except NotFoundError as exc:
         _raise_not_found(exc)
 
@@ -125,8 +131,8 @@ def officer_kpis(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        total, records = service.get_officer_kpis()
-        return OfficerKPIResponse(total=total, records=records)
+        page = service.get_officer_kpis()
+        return OfficerKPIResponse(total=page.total, records=page.records)
     except NotFoundError as exc:
         _raise_not_found(exc)
 
@@ -137,8 +143,8 @@ def list_feedback(
     _: TokenData = Depends(get_current_user),
     service: RiskService = Depends(get_risk_service),
 ):
-    total, records = service.list_feedback(limit)
-    return FeedbackListResponse(total=total, records=records)
+    page = service.list_feedback(limit)
+    return FeedbackListResponse(total=page.total, records=page.records)
 
 
 @app.post("/api/v1/feedback/submit", response_model=FeedbackSubmissionResponse, tags=["Feedback"])
@@ -148,15 +154,16 @@ def submit_feedback(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        feedback_total, saved = service.submit_feedback(
-            payload=body.model_dump(),
+        submission = FeedbackSubmission(**body.model_dump())
+        result = service.submit_feedback(
+            payload=submission,
             recorded_by=current_user.username,
         )
         return FeedbackSubmissionResponse(
             status="success",
             message="Feedback saved successfully.",
-            feedback_total=feedback_total,
-            record=saved,
+            feedback_total=result.feedback_total,
+            record=result.record,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -171,13 +178,13 @@ def refresh_plan_from_feedback(
     service: RiskService = Depends(get_risk_service),
 ):
     try:
-        visit_rows, kpi_rows, feedback_rows = service.refresh_plan_from_feedback()
+        result = service.refresh_plan_from_feedback()
         return PlanRefreshResponse(
             status="success",
             message="Visit plan and officer KPIs refreshed from latest feedback.",
-            visit_plan_rows=visit_rows,
-            officer_kpi_rows=kpi_rows,
-            feedback_rows=feedback_rows,
+            visit_plan_rows=result.visit_plan_rows,
+            officer_kpi_rows=result.officer_kpi_rows,
+            feedback_rows=result.feedback_rows,
         )
     except NotFoundError as exc:
         _raise_not_found(exc)
@@ -195,14 +202,14 @@ def run_pipeline(
 ):
     """Trigger the full pipeline (admin only). Retrains model and refreshes all outputs."""
     try:
-        scored_count, top_risky_count, visit_rows, kpi_rows = service.run_pipeline()
+        result = service.run_pipeline()
         return PipelineRunResponse(
             status="success",
             message="Pipeline completed successfully.",
-            scored_accounts=scored_count,
-            top_risky_accounts=top_risky_count,
-            visit_plan_rows=visit_rows,
-            officer_kpi_rows=kpi_rows,
+            scored_accounts=result.scored_accounts,
+            top_risky_accounts=result.top_risky_accounts,
+            visit_plan_rows=result.visit_plan_rows,
+            officer_kpi_rows=result.officer_kpi_rows,
         )
     except Exception as exc:
         logger.exception("Pipeline run failed")
