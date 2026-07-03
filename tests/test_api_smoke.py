@@ -374,3 +374,28 @@ def test_pipeline_async_force_submission_creates_new_job() -> None:
     assert first.status_code == 202
     assert second.status_code == 202
     assert first.json()["job_id"] != second.json()["job_id"]
+
+
+def test_pipeline_async_returns_429_when_queue_capacity_exceeded() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_limit = job_service._max_queued_jobs
+    try:
+        existing_queued = int(job_service.get_job_stats()["counts"]["queued"])
+        job_service._max_queued_jobs = existing_queued + 1
+        first = client.post(
+            "/api/v1/jobs/pipeline/run?force=true",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert first.status_code == 202
+
+        second = client.post(
+            "/api/v1/jobs/pipeline/run?force=true",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert second.status_code == 429
+    finally:
+        job_service._max_queued_jobs = original_limit

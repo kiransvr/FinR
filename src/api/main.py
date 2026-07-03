@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
 from src.application.job_service import JobService
+from src.application.job_service import QueueCapacityExceededError
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
@@ -61,6 +62,7 @@ _job_service = JobService(
     retry_backoff_seconds=float(os.getenv("JOB_RETRY_BACKOFF_SECONDS", "0.2")),
     default_timeout_seconds=float(os.getenv("JOB_TIMEOUT_SECONDS", "60")),
     running_stale_seconds=float(os.getenv("JOB_RUNNING_STALE_SECONDS", "300")),
+    max_queued_jobs=int(os.getenv("JOB_MAX_QUEUED_JOBS", "500")),
 )
 _job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
 _job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)
@@ -366,10 +368,13 @@ def run_pipeline_async(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    if force:
-        state = jobs.submit(job_type="pipeline_run", payload={})
-    else:
-        state, _ = jobs.submit_deduplicated(job_type="pipeline_run", payload={})
+    try:
+        if force:
+            state = jobs.submit(job_type="pipeline_run", payload={})
+        else:
+            state, _ = jobs.submit_deduplicated(job_type="pipeline_run", payload={})
+    except QueueCapacityExceededError as exc:
+        raise HTTPException(status_code=429, detail=str(exc))
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,
@@ -394,10 +399,13 @@ def refresh_plan_async(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    if force:
-        state = jobs.submit(job_type="refresh_plan", payload={})
-    else:
-        state, _ = jobs.submit_deduplicated(job_type="refresh_plan", payload={})
+    try:
+        if force:
+            state = jobs.submit(job_type="refresh_plan", payload={})
+        else:
+            state, _ = jobs.submit_deduplicated(job_type="refresh_plan", payload={})
+    except QueueCapacityExceededError as exc:
+        raise HTTPException(status_code=429, detail=str(exc))
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,

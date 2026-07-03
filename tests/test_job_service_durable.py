@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 
 from src.application.job_service import JobService
+from src.application.job_service import QueueCapacityExceededError
 
 
 def test_job_state_persists_in_sqlite_queue(tmp_path: Path) -> None:
@@ -331,3 +332,16 @@ def test_stop_worker_prevents_further_processing(tmp_path: Path) -> None:
     state = service.get(submitted.job_id)
     assert state is not None
     assert state.status == "queued"
+
+
+def test_submit_raises_when_queue_capacity_exceeded(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_queued_jobs=1)
+    service.register_handler("capacity_job", lambda _: {"ok": True})
+
+    service.submit("capacity_job", payload={})
+    try:
+        service.submit("capacity_job", payload={})
+        assert False, "Expected QueueCapacityExceededError"
+    except QueueCapacityExceededError:
+        pass

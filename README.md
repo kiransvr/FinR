@@ -111,6 +111,7 @@ The API supports environment-driven security settings:
 - `JOB_RETRY_BACKOFF_SECONDS`: linear retry backoff base seconds (default `0.2`).
 - `JOB_TIMEOUT_SECONDS`: per-job execution timeout before retry/dead-letter handling (default `60`).
 - `JOB_RUNNING_STALE_SECONDS`: threshold for auto-recovering stale `running` jobs in worker loop (default `300`).
+- `JOB_MAX_QUEUED_JOBS`: queue backpressure limit for `queued` jobs; async submit returns HTTP 429 when exceeded (default `500`).
 
 Operational docs:
 

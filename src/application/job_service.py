@@ -12,6 +12,10 @@ from typing import Callable
 from uuid import uuid4
 
 
+class QueueCapacityExceededError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class JobState:
     job_id: str
@@ -37,6 +41,7 @@ class JobService:
         retry_backoff_seconds: float = 0.2,
         default_timeout_seconds: float = 60.0,
         running_stale_seconds: float = 300.0,
+        max_queued_jobs: int = 500,
     ):
         self._db_path = db_path
         self._poll_interval_seconds = poll_interval_seconds
@@ -44,6 +49,7 @@ class JobService:
         self._retry_backoff_seconds = max(0.0, retry_backoff_seconds)
         self._default_timeout_seconds = max(0.01, default_timeout_seconds)
         self._running_stale_seconds = max(1.0, running_stale_seconds)
+        self._max_queued_jobs = max(1, max_queued_jobs)
         self._handlers: dict[str, Callable[[dict], dict]] = {}
         self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
         self._lock = Lock()
@@ -84,6 +90,7 @@ class JobService:
         resolved_max_attempts = max(1, max_attempts or self._default_max_attempts)
         resolved_timeout_seconds = max(0.01, timeout_seconds or self._default_timeout_seconds)
         with self._connect() as conn:
+            self._enforce_queue_capacity(conn)
             conn.execute(
                 """
                 INSERT INTO job_queue(
@@ -149,6 +156,20 @@ class JobService:
             max_attempts=max_attempts,
             timeout_seconds=timeout_seconds,
         ), True
+
+    def _enforce_queue_capacity(self, conn: sqlite3.Connection) -> None:
+        queued_count_row = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM job_queue
+            WHERE status = 'queued'
+            """
+        ).fetchone()
+        queued_count = int(queued_count_row[0]) if queued_count_row else 0
+        if queued_count >= self._max_queued_jobs:
+            raise QueueCapacityExceededError(
+                f"Queue capacity exceeded: queued={queued_count}, max={self._max_queued_jobs}"
+            )
 
     def get(self, job_id: str) -> JobState | None:
         with self._connect() as conn:
