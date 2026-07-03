@@ -79,7 +79,11 @@ def append_feedback_record(path: Path, record: dict) -> tuple[pd.DataFrame, dict
         raise ValueError("AccountId is required for feedback submission.")
 
     feedback_df = load_feedback_log(path)
-    feedback_df = pd.concat([feedback_df, pd.DataFrame([canonical])], ignore_index=True)
+    new_row = pd.DataFrame([canonical], columns=FEEDBACK_COLUMNS)
+    if feedback_df.empty:
+        feedback_df = new_row
+    else:
+        feedback_df = pd.concat([feedback_df, new_row], ignore_index=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     feedback_df.to_csv(path, index=False)
     return feedback_df, canonical
