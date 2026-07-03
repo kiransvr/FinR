@@ -69,6 +69,19 @@ def test_request_id_header_is_returned() -> None:
     assert response.headers.get(REQUEST_ID_HEADER) == request_id
 
 
+def test_metrics_endpoint_exposes_prometheus_text() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/metrics",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    body = response.text
+    assert "loan_default_api_requests_total" in body
+    assert "loan_default_api_errors_total" in body
+    assert "loan_default_api_requests_by_route_total" in body
+
+
 def _login(username: str, password: str) -> str:
     response = client.post(
         "/api/v1/auth/login",

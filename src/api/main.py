@@ -10,7 +10,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
@@ -22,7 +22,7 @@ from src.api.auth import (
 )
 from src.api.guardrails import enforce_runtime_settings
 from src.api.observability import install_observability_middleware
-from src.api.observability import REQUEST_ID_HEADER
+from src.api.observability import REQUEST_ID_HEADER, get_observability_store
 from src.api.rate_limit import SlidingWindowRateLimiter
 from src.api.schemas import (
     ApiErrorBody,
@@ -170,6 +170,11 @@ def ready_health(service: RiskService = Depends(get_risk_service)):
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["Health"])
 def health(service: RiskService = Depends(get_risk_service)):
     return ready_health(service)
+
+
+@app.get("/api/v1/metrics", response_class=PlainTextResponse, tags=["Observability"])
+def metrics(_: TokenData = Depends(get_current_user)):
+    return PlainTextResponse(get_observability_store().render_prometheus())
 
 
 # ── Outputs ───────────────────────────────────────────────────────────────────

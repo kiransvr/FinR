@@ -61,6 +61,10 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
 - `GET /api/v1/jobs/{job_id}` to check job status and result
 
+Observability endpoint (admin):
+
+- `GET /api/v1/metrics` returns Prometheus-compatible API metrics text
+
 In the dashboard, use the sidebar upload control to replace the active input file and run the pipeline from the UI.
 
 ## Security configuration
