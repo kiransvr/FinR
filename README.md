@@ -66,6 +66,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/pipeline/run` to execute full pipeline asynchronously
 - `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
 - `GET /api/v1/jobs/{job_id}` to check job status and result (`queued`, `running`, `succeeded`, `dead_letter`)
+- `POST /api/v1/jobs/{job_id}/requeue` (admin) to requeue dead-letter jobs
 
 Auth security endpoints:
 

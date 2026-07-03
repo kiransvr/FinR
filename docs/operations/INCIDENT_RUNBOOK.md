@@ -47,6 +47,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - If adapter migration is suspected, switch to `OUTPUT_STORE_ADAPTER=csv` and restart service.
 - If bad outputs are suspected, rerun pipeline from a verified input snapshot.
 - If auth abuse is suspected, tighten login rate limits temporarily.
+- If async jobs are failing, inspect dead-letter jobs and requeue after fix using `POST /api/v1/jobs/{job_id}/requeue`.
 
 ## Recovery Verification
 

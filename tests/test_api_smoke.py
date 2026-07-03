@@ -186,3 +186,12 @@ def test_async_refresh_job_submission_and_status() -> None:
     assert status.status_code == 200
     status_payload = status.json()
     assert status_payload["status"] in {"queued", "running", "succeeded", "dead_letter"}
+
+
+def test_requeue_endpoint_returns_not_found_for_unknown_job() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/does-not-exist/requeue",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 404

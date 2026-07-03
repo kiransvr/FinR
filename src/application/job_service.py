@@ -135,6 +135,40 @@ class JobService:
             updated_at=row[6],
         )
 
+    def requeue_dead_letter(self, job_id: str) -> JobState | None:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT job_type, status
+                    FROM job_queue
+                    WHERE job_id = ?
+                    """,
+                    (job_id,),
+                ).fetchone()
+
+                if row is None:
+                    return None
+
+                job_type = str(row[0])
+                status = str(row[1])
+                if status != "dead_letter":
+                    raise ValueError("Only dead-letter jobs can be requeued")
+                if job_type not in self._handlers:
+                    raise ValueError(f"No handler registered for job_type '{job_type}'")
+
+                now = self._utc_now()
+                conn.execute(
+                    """
+                    UPDATE job_queue
+                    SET status = ?, attempts = 0, result_json = NULL, error = NULL, next_attempt_at = ?, updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    ("queued", now, now, job_id),
+                )
+
+        return self.get(job_id)
+
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
             claimed = self._claim_next_queued_job()
