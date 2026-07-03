@@ -56,6 +56,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.
+- Use `POST /api/v1/jobs/pause` before maintenance actions and `POST /api/v1/jobs/resume` after verification to control background execution safely.
 
 ## Recovery Verification
 

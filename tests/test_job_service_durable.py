@@ -345,3 +345,30 @@ def test_submit_raises_when_queue_capacity_exceeded(tmp_path: Path) -> None:
         assert False, "Expected QueueCapacityExceededError"
     except QueueCapacityExceededError:
         pass
+
+
+def test_pause_and_resume_processing_controls_worker_execution(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("pause_job", lambda _: {"ok": True})
+    service.start_worker()
+    service.pause_processing()
+
+    submitted = service.submit("pause_job", payload={})
+    time.sleep(0.05)
+
+    paused_state = service.get(submitted.job_id)
+    assert paused_state is not None
+    assert paused_state.status == "queued"
+
+    service.resume_processing()
+    succeeded = None
+    for _ in range(200):
+        current = service.get(submitted.job_id)
+        assert current is not None
+        if current.status == "succeeded":
+            succeeded = current
+            break
+        time.sleep(0.01)
+
+    assert succeeded is not None

@@ -54,6 +54,7 @@ class JobService:
         self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
         self._lock = Lock()
         self._stop_event = Event()
+        self._processing_paused = False
         self._worker: Thread | None = None
         self._ensure_schema()
 
@@ -73,6 +74,18 @@ class JobService:
             self._worker.join(timeout=max(0.1, join_timeout_seconds))
         self._worker = None
         self._runner_executor.shutdown(wait=False, cancel_futures=True)
+
+    def pause_processing(self) -> None:
+        with self._lock:
+            self._processing_paused = True
+
+    def resume_processing(self) -> None:
+        with self._lock:
+            self._processing_paused = False
+
+    def is_processing_paused(self) -> bool:
+        with self._lock:
+            return self._processing_paused
 
     def submit(
         self,
@@ -235,6 +248,7 @@ class JobService:
         counts = {str(row[0]): int(row[1]) for row in count_rows}
         oldest = {str(row[0]): str(row[1]) for row in oldest_rows if row[1]}
         return {
+            "paused": self.is_processing_paused(),
             "counts": {
                 "queued": counts.get("queued", 0),
                 "running": counts.get("running", 0),
@@ -387,6 +401,9 @@ class JobService:
 
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
+            if self.is_processing_paused():
+                time.sleep(self._poll_interval_seconds)
+                continue
             self.recover_stale_running_jobs()
             claimed = self._claim_next_queued_job()
             if not claimed:

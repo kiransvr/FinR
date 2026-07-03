@@ -457,6 +457,7 @@ def get_job_stats(
     oldest = cast(dict[str, str | None], stats["oldest"])
     return JobStatsResponse(
         status="success",
+        paused=bool(stats["paused"]),
         counts=JobStatsCounts(
             queued=int(counts["queued"]),
             running=int(counts["running"]),
@@ -471,6 +472,34 @@ def get_job_stats(
             dead_letter=oldest["dead_letter"],
         ),
     )
+
+
+@app.post("/api/v1/jobs/pause", response_model=AuthActionResponse, tags=["Jobs"])
+def pause_job_processing(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    jobs.pause_processing()
+    return AuthActionResponse(status="success", message="Job processing paused.")
+
+
+@app.post("/api/v1/jobs/resume", response_model=AuthActionResponse, tags=["Jobs"])
+def resume_job_processing(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    jobs.resume_processing()
+    return AuthActionResponse(status="success", message="Job processing resumed.")
 
 
 @app.get("/api/v1/jobs/{job_id}", response_model=JobStatusResponse, tags=["Jobs"])

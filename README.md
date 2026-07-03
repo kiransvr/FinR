@@ -72,6 +72,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/recover-stale?stale_after_seconds=300` (admin) to recover stale `running` jobs
 - `GET /api/v1/jobs?status=queued&limit=50` (admin) to list recent jobs for triage
 - `GET /api/v1/jobs/stats` (admin) to inspect queue backlog and status distribution
+- `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 
 Async submit deduplication:
 

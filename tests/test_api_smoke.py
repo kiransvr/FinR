@@ -399,3 +399,49 @@ def test_pipeline_async_returns_429_when_queue_capacity_exceeded() -> None:
         assert second.status_code == 429
     finally:
         job_service._max_queued_jobs = original_limit
+
+
+def test_pause_and_resume_endpoints_require_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+
+    pause = client.post(
+        "/api/v1/jobs/pause",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert pause.status_code == 403
+
+    resume = client.post(
+        "/api/v1/jobs/resume",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert resume.status_code == 403
+
+
+def test_pause_and_resume_endpoints_toggle_stats_paused_flag() -> None:
+    admin_token = _login("admin", "changeme")
+
+    pause = client.post(
+        "/api/v1/jobs/pause",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert pause.status_code == 200
+
+    paused_stats = client.get(
+        "/api/v1/jobs/stats",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert paused_stats.status_code == 200
+    assert paused_stats.json()["paused"] is True
+
+    resume = client.post(
+        "/api/v1/jobs/resume",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resume.status_code == 200
+
+    resumed_stats = client.get(
+        "/api/v1/jobs/stats",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resumed_stats.status_code == 200
+    assert resumed_stats.json()["paused"] is False

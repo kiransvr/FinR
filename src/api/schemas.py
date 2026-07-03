@@ -152,6 +152,7 @@ class JobStatsOldest(BaseModel):
 
 class JobStatsResponse(BaseModel):
     status: str
+    paused: bool
     counts: JobStatsCounts
     oldest: JobStatsOldest
 
