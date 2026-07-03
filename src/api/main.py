@@ -27,12 +27,13 @@ from src.api.schemas import (
     FeedbackListResponse,
     PlanRefreshResponse,
 )
+from src.bootstrap.service_factory import build_risk_service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
-_risk_service = RiskService(base_dir=BASE_DIR)
+_risk_service = build_risk_service(BASE_DIR)
 
 
 def get_risk_service() -> RiskService:

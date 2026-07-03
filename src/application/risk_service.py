@@ -12,9 +12,8 @@ from src.application.contracts import (
     PlanRefreshResult,
     RecordPage,
 )
+from src.application.ports import OutputStore
 from src.collection_ops import generate_officer_kpis, generate_visit_plan
-from src.config import ProjectConfig
-from src.infrastructure.output_repository import OutputRepository
 
 
 class NotFoundError(Exception):
@@ -24,10 +23,9 @@ class NotFoundError(Exception):
 class RiskService:
     """Application service orchestrating risk operations and output workflows."""
 
-    def __init__(self, base_dir: Path):
+    def __init__(self, base_dir: Path, output_store: OutputStore):
         self._base_dir = base_dir
-        self._config = ProjectConfig(base_dir=base_dir)
-        self._repository = OutputRepository(self._config)
+        self._repository = output_store
 
     def get_health(self) -> HealthStatus:
         return HealthStatus(

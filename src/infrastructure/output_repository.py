@@ -4,11 +4,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.application.ports import OutputStore
 from src.collection_ops import append_feedback_record, load_feedback_log
 from src.config import ProjectConfig
 
 
-class OutputRepository:
+class OutputRepository(OutputStore):
     """Infrastructure adapter for reading and writing output artifacts."""
 
     def __init__(self, config: ProjectConfig):
