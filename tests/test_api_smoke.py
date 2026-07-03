@@ -445,3 +445,26 @@ def test_pause_and_resume_endpoints_toggle_stats_paused_flag() -> None:
     )
     assert resumed_stats.status_code == 200
     assert resumed_stats.json()["paused"] is False
+
+
+def test_async_submit_returns_423_when_processing_paused() -> None:
+    admin_token = _login("admin", "changeme")
+
+    pause = client.post(
+        "/api/v1/jobs/pause",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert pause.status_code == 200
+
+    try:
+        submit = client.post(
+            "/api/v1/jobs/pipeline/run",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert submit.status_code == 423
+    finally:
+        resume = client.post(
+            "/api/v1/jobs/resume",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resume.status_code == 200

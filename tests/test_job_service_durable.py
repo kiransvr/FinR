@@ -6,6 +6,7 @@ import sqlite3
 
 from src.application.job_service import JobService
 from src.application.job_service import QueueCapacityExceededError
+from src.application.job_service import ProcessingPausedError
 
 
 def test_job_state_persists_in_sqlite_queue(tmp_path: Path) -> None:
@@ -350,16 +351,19 @@ def test_submit_raises_when_queue_capacity_exceeded(tmp_path: Path) -> None:
 def test_pause_and_resume_processing_controls_worker_execution(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, poll_interval_seconds=0.01)
-    service.register_handler("pause_job", lambda _: {"ok": True})
-    service.start_worker()
-    service.pause_processing()
+    def _slow(_: dict) -> dict:
+        time.sleep(0.2)
+        return {"ok": True}
 
+    service.register_handler("pause_job", _slow)
+    service.start_worker()
     submitted = service.submit("pause_job", payload={})
+    service.pause_processing()
     time.sleep(0.05)
 
     paused_state = service.get(submitted.job_id)
     assert paused_state is not None
-    assert paused_state.status == "queued"
+    assert paused_state.status in {"queued", "running"}
 
     service.resume_processing()
     succeeded = None
@@ -372,3 +376,16 @@ def test_pause_and_resume_processing_controls_worker_execution(tmp_path: Path) -
         time.sleep(0.01)
 
     assert succeeded is not None
+
+
+def test_submit_raises_when_processing_paused(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("paused_job", lambda _: {"ok": True})
+    service.pause_processing()
+
+    try:
+        service.submit("paused_job", payload={})
+        assert False, "Expected ProcessingPausedError"
+    except ProcessingPausedError:
+        pass

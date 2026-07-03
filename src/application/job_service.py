@@ -16,6 +16,10 @@ class QueueCapacityExceededError(RuntimeError):
     pass
 
 
+class ProcessingPausedError(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True)
 class JobState:
     job_id: str
@@ -103,6 +107,7 @@ class JobService:
         resolved_max_attempts = max(1, max_attempts or self._default_max_attempts)
         resolved_timeout_seconds = max(0.01, timeout_seconds or self._default_timeout_seconds)
         with self._connect() as conn:
+            self._enforce_processing_active()
             self._enforce_queue_capacity(conn)
             conn.execute(
                 """
@@ -147,6 +152,8 @@ class JobService:
         if job_type not in self._handlers:
             raise ValueError(f"No handler registered for job_type '{job_type}'")
 
+        self._enforce_processing_active()
+
         with self._lock:
             with self._connect() as conn:
                 existing = conn.execute(
@@ -183,6 +190,10 @@ class JobService:
             raise QueueCapacityExceededError(
                 f"Queue capacity exceeded: queued={queued_count}, max={self._max_queued_jobs}"
             )
+
+    def _enforce_processing_active(self) -> None:
+        if self.is_processing_paused():
+            raise ProcessingPausedError("Job processing is paused")
 
     def get(self, job_id: str) -> JobState | None:
         with self._connect() as conn:

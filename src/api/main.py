@@ -17,6 +17,7 @@ from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
 from src.application.job_service import JobService
 from src.application.job_service import QueueCapacityExceededError
+from src.application.job_service import ProcessingPausedError
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
@@ -373,6 +374,8 @@ def run_pipeline_async(
             state = jobs.submit(job_type="pipeline_run", payload={})
         else:
             state, _ = jobs.submit_deduplicated(job_type="pipeline_run", payload={})
+    except ProcessingPausedError as exc:
+        raise HTTPException(status_code=423, detail=str(exc))
     except QueueCapacityExceededError as exc:
         raise HTTPException(status_code=429, detail=str(exc))
     return JobSubmitResponse(
@@ -404,6 +407,8 @@ def refresh_plan_async(
             state = jobs.submit(job_type="refresh_plan", payload={})
         else:
             state, _ = jobs.submit_deduplicated(job_type="refresh_plan", payload={})
+    except ProcessingPausedError as exc:
+        raise HTTPException(status_code=423, detail=str(exc))
     except QueueCapacityExceededError as exc:
         raise HTTPException(status_code=429, detail=str(exc))
     return JobSubmitResponse(

@@ -82,6 +82,7 @@ Async submit deduplication:
 Worker lifecycle reliability:
 
 - Background job worker now starts on API startup and stops gracefully on API shutdown to avoid orphan processing threads during restart/deploy.
+- While processing is paused (`POST /api/v1/jobs/pause`), async submit endpoints return HTTP `423 Locked` until resumed.
 
 Auth security endpoints:
 
