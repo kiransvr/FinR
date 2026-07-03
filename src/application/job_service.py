@@ -169,6 +169,37 @@ class JobService:
 
         return self.get(job_id)
 
+    def cancel_queued_job(self, job_id: str) -> JobState | None:
+        with self._lock:
+            with self._connect() as conn:
+                row = conn.execute(
+                    """
+                    SELECT status
+                    FROM job_queue
+                    WHERE job_id = ?
+                    """,
+                    (job_id,),
+                ).fetchone()
+
+                if row is None:
+                    return None
+
+                status = str(row[0])
+                if status != "queued":
+                    raise ValueError("Only queued jobs can be canceled")
+
+                now = self._utc_now()
+                conn.execute(
+                    """
+                    UPDATE job_queue
+                    SET status = ?, next_attempt_at = NULL, updated_at = ?
+                    WHERE job_id = ?
+                    """,
+                    ("canceled", now, job_id),
+                )
+
+        return self.get(job_id)
+
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
             claimed = self._claim_next_queued_job()

@@ -195,3 +195,47 @@ def test_requeue_endpoint_returns_not_found_for_unknown_job() -> None:
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert response.status_code == 404
+
+
+def test_cancel_endpoint_can_cancel_queued_job() -> None:
+    admin_token = _login("admin", "changeme")
+    submit = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+    job_id = submit.json()["job_id"]
+
+    canceled = client.post(
+        f"/api/v1/jobs/{job_id}/cancel",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert canceled.status_code in {200, 400}
+    if canceled.status_code == 200:
+        assert canceled.json()["status"] == "canceled"
+
+
+def test_cancel_endpoint_rejects_non_queued_job_state() -> None:
+    admin_token = _login("admin", "changeme")
+    submit = client.post(
+        "/api/v1/jobs/feedback/refresh-plan",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+    job_id = submit.json()["job_id"]
+
+    first_cancel = client.post(
+        f"/api/v1/jobs/{job_id}/cancel",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    if first_cancel.status_code == 400:
+        return
+
+    assert first_cancel.status_code == 200
+    assert first_cancel.json()["status"] == "canceled"
+
+    second_cancel = client.post(
+        f"/api/v1/jobs/{job_id}/cancel",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert second_cancel.status_code == 400

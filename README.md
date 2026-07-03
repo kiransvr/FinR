@@ -67,6 +67,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
 - `GET /api/v1/jobs/{job_id}` to check job status and result (`queued`, `running`, `succeeded`, `dead_letter`)
 - `POST /api/v1/jobs/{job_id}/requeue` (admin) to requeue dead-letter jobs
+- `POST /api/v1/jobs/{job_id}/cancel` (admin) to cancel queued jobs
 
 Auth security endpoints:
 

@@ -424,3 +424,29 @@ def requeue_dead_letter_job(
         result=state.result,
         error=state.error,
     )
+
+
+@app.post("/api/v1/jobs/{job_id}/cancel", response_model=JobStatusResponse, tags=["Jobs"])
+def cancel_queued_job(
+    job_id: str,
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    require_role(current_user.role, "admin")
+    try:
+        state = jobs.cancel_queued_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if state is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+
+    return JobStatusResponse(
+        job_id=state.job_id,
+        job_type=state.job_type,
+        status=state.status,
+        created_at=state.created_at,
+        updated_at=state.updated_at,
+        result=state.result,
+        error=state.error,
+    )

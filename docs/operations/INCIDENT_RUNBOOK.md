@@ -48,6 +48,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - If bad outputs are suspected, rerun pipeline from a verified input snapshot.
 - If auth abuse is suspected, tighten login rate limits temporarily.
 - If async jobs are failing, inspect dead-letter jobs and requeue after fix using `POST /api/v1/jobs/{job_id}/requeue`.
+- If an async job was submitted in error and still queued, cancel it via `POST /api/v1/jobs/{job_id}/cancel`.
 
 ## Recovery Verification
 

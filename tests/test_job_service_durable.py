@@ -148,3 +148,21 @@ def test_dead_letter_job_can_be_requeued(tmp_path: Path) -> None:
 
     assert succeeded is not None
     assert succeeded.result == {"ok": True}
+
+
+def test_queued_job_can_be_canceled(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+
+    service = JobService(
+        db_path=db_path,
+        poll_interval_seconds=0.01,
+        max_attempts=1,
+        retry_backoff_seconds=0.01,
+    )
+    service.register_handler("cancel_me", lambda _: {"ok": True})
+
+    submitted = service.submit("cancel_me", payload={})
+    canceled = service.cancel_queued_job(submitted.job_id)
+
+    assert canceled is not None
+    assert canceled.status == "canceled"
