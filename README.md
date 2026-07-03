@@ -67,6 +67,7 @@ The API supports environment-driven security settings:
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD`: admin credentials for demo auth.
 - `ENABLE_DEMO_OFFICER_USER`: set to `false` to disable the seeded officer user.
 - `OFFICER_USERNAME`, `OFFICER_PASSWORD`: optional demo officer credentials.
+- `OUTPUT_STORE_ADAPTER`: output store adapter selector (`csv` default, `db_stub` for migration parity mode).
 
 ## Quick start
 
