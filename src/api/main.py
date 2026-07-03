@@ -50,7 +50,9 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parents[3]
 _risk_service = build_risk_service(BASE_DIR)
 _job_service = JobService(
-    db_path=Path(os.getenv("JOB_QUEUE_DB_PATH", (BASE_DIR / "outputs" / "job_queue.db").as_posix()))
+    db_path=Path(os.getenv("JOB_QUEUE_DB_PATH", (BASE_DIR / "outputs" / "job_queue.db").as_posix())),
+    max_attempts=int(os.getenv("JOB_MAX_ATTEMPTS", "3")),
+    retry_backoff_seconds=float(os.getenv("JOB_RETRY_BACKOFF_SECONDS", "0.2")),
 )
 _job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
 _job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)

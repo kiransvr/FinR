@@ -20,7 +20,7 @@ def test_job_state_persists_in_sqlite_queue(tmp_path: Path) -> None:
         current = service.get(submitted.job_id)
         assert current is not None
         final_status = current.status
-        if final_status in {"succeeded", "failed"}:
+        if final_status in {"succeeded", "dead_letter"}:
             break
         time.sleep(0.01)
 
@@ -31,3 +31,37 @@ def test_job_state_persists_in_sqlite_queue(tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.status == "succeeded"
     assert loaded.result == {"echo": "ok"}
+
+
+def test_job_retries_then_moves_to_dead_letter(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+
+    service = JobService(
+        db_path=db_path,
+        poll_interval_seconds=0.01,
+        max_attempts=2,
+        retry_backoff_seconds=0.01,
+    )
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("failing_job", _always_fail)
+    service.start_worker()
+
+    submitted = service.submit("failing_job", payload={})
+
+    final = None
+    for _ in range(300):
+        current = service.get(submitted.job_id)
+        assert current is not None
+        if current.status == "dead_letter":
+            final = current
+            break
+        time.sleep(0.01)
+
+    assert final is not None
+    assert final.status == "dead_letter"
+    assert final.attempts == 2
+    assert final.max_attempts == 2
+    assert "boom" in (final.error or "")

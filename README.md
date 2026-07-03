@@ -65,7 +65,7 @@ Background job endpoints (admin):
 
 - `POST /api/v1/jobs/pipeline/run` to execute full pipeline asynchronously
 - `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
-- `GET /api/v1/jobs/{job_id}` to check job status and result
+- `GET /api/v1/jobs/{job_id}` to check job status and result (`queued`, `running`, `succeeded`, `dead_letter`)
 
 Auth security endpoints:
 
@@ -92,6 +92,8 @@ The API supports environment-driven security settings:
 - `OUTPUT_STORE_ADAPTER`: output store adapter selector (`csv` default, `db` for SQL-backed mode; `db_stub` kept as compatibility alias).
 - `DB_OUTPUT_DATABASE_URL`: optional SQLAlchemy DB URL for output persistence. Defaults to local SQLite at `outputs/output_store.db`.
 - `JOB_QUEUE_DB_PATH`: optional durable job queue SQLite path. Defaults to `outputs/job_queue.db`.
+- `JOB_MAX_ATTEMPTS`: max retry attempts per background job before dead-letter (default `3`).
+- `JOB_RETRY_BACKOFF_SECONDS`: linear retry backoff base seconds (default `0.2`).
 
 Operational docs:
 

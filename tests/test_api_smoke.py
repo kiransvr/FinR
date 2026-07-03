@@ -161,11 +161,11 @@ def test_async_pipeline_job_submission_and_status() -> None:
         )
         assert status.status_code == 200
         status_payload = status.json()
-        if status_payload["status"] in {"succeeded", "failed"}:
+        if status_payload["status"] in {"succeeded", "dead_letter"}:
             break
         time.sleep(0.05)
 
-    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
+    assert status_payload["status"] in {"queued", "running", "succeeded", "dead_letter"}
 
 
 def test_async_refresh_job_submission_and_status() -> None:
@@ -185,4 +185,4 @@ def test_async_refresh_job_submission_and_status() -> None:
     )
     assert status.status_code == 200
     status_payload = status.json()
-    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
+    assert status_payload["status"] in {"queued", "running", "succeeded", "dead_letter"}
