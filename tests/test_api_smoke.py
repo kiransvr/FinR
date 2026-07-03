@@ -524,3 +524,29 @@ def test_drain_status_endpoint_returns_shape() -> None:
     assert isinstance(payload["running"], int)
     assert isinstance(payload["queued"], int)
     assert isinstance(payload["drained"], bool)
+
+
+def test_drain_wait_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/drain-wait?timeout_seconds=0",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_drain_wait_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/drain-wait?timeout_seconds=0",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["paused"], bool)
+    assert isinstance(payload["running"], int)
+    assert isinstance(payload["queued"], int)
+    assert isinstance(payload["drained"], bool)
+    assert isinstance(payload["timed_out"], bool)
+    assert isinstance(payload["timeout_seconds"], float)

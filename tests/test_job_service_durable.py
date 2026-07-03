@@ -445,3 +445,25 @@ def test_get_drain_status_reflects_pause_and_running_state(tmp_path: Path) -> No
     assert isinstance(status["running"], int)
     assert isinstance(status["queued"], int)
     assert isinstance(status["drained"], bool)
+
+
+def test_wait_for_drain_returns_drained_when_paused_and_no_running_jobs(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("drain_wait_job", lambda _: {"ok": True})
+    service.pause_processing()
+
+    status = service.wait_for_drain(timeout_seconds=0.1)
+    assert status["paused"] is True
+    assert status["drained"] is True
+    assert status["timed_out"] is False
+
+
+def test_wait_for_drain_times_out_when_not_drained(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("drain_wait_job", lambda _: {"ok": True})
+
+    status = service.wait_for_drain(timeout_seconds=0.05, poll_interval_seconds=0.01)
+    assert status["drained"] is False
+    assert status["timed_out"] is True

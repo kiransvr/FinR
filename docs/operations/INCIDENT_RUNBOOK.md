@@ -60,6 +60,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - While paused, async submit endpoints are expected to return HTTP `423 Locked`; resume processing before re-triggering jobs.
 - To quickly drain unsafe backlog, use `POST /api/v1/jobs/cancel-queued` (optionally `?job_type=...`) before controlled recovery.
 - Use `GET /api/v1/jobs/drain-status` to confirm paused mode has no running work before resume or deployment cutover.
+- Use `POST /api/v1/jobs/drain-wait?timeout_seconds=30` to block briefly for drain completion and receive explicit timeout status.
 
 ## Recovery Verification
 

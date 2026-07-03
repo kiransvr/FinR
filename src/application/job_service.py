@@ -288,6 +288,27 @@ class JobService:
             "drained": paused and running == 0,
         }
 
+    def wait_for_drain(self, timeout_seconds: float = 30.0, poll_interval_seconds: float = 0.1) -> dict[str, object]:
+        timeout = max(0.0, timeout_seconds)
+        poll = max(0.01, poll_interval_seconds)
+        deadline = time.monotonic() + timeout
+
+        while True:
+            drain = self.get_drain_status()
+            if bool(drain["drained"]):
+                return {
+                    **drain,
+                    "timed_out": False,
+                    "timeout_seconds": timeout,
+                }
+            if time.monotonic() >= deadline:
+                return {
+                    **drain,
+                    "timed_out": True,
+                    "timeout_seconds": timeout,
+                }
+            time.sleep(poll)
+
     def requeue_dead_letter(self, job_id: str) -> JobState | None:
         with self._lock:
             with self._connect() as conn:

@@ -175,3 +175,13 @@ class JobDrainStatusResponse(BaseModel):
     running: int
     queued: int
     drained: bool
+
+
+class JobDrainWaitResponse(BaseModel):
+    status: str
+    paused: bool
+    running: int
+    queued: int
+    drained: bool
+    timed_out: bool
+    timeout_seconds: float

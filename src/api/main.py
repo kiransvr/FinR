@@ -51,6 +51,7 @@ from src.api.schemas import (
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
+    JobDrainWaitResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
 
@@ -501,6 +502,29 @@ def get_job_drain_status(
         running=running_count,
         queued=queued_count,
         drained=bool(typed_drain["drained"]),
+    )
+
+
+@app.post("/api/v1/jobs/drain-wait", response_model=JobDrainWaitResponse, tags=["Jobs"])
+def wait_for_job_drain(
+    timeout_seconds: float = Query(default=30.0, ge=0.0, le=300.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    drain = cast(dict[str, object], jobs.wait_for_drain(timeout_seconds=timeout_seconds))
+    return JobDrainWaitResponse(
+        status="success",
+        paused=bool(drain["paused"]),
+        running=cast(int, drain["running"]),
+        queued=cast(int, drain["queued"]),
+        drained=bool(drain["drained"]),
+        timed_out=bool(drain["timed_out"]),
+        timeout_seconds=float(cast(float, drain["timeout_seconds"])),
     )
 
 

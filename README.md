@@ -75,6 +75,7 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/cancel-queued` (admin) to bulk-cancel queued jobs (`?job_type=...` optional)
 - `GET /api/v1/jobs/drain-status` (admin) to verify whether paused processing is fully drained
+- `POST /api/v1/jobs/drain-wait?timeout_seconds=30` (admin) to wait for paused workers to drain with timeout feedback
 
 Async submit deduplication:
 
