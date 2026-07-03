@@ -49,7 +49,12 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[3]
 _risk_service = build_risk_service(BASE_DIR)
-_job_service = JobService(max_workers=2)
+_job_service = JobService(
+    db_path=Path(os.getenv("JOB_QUEUE_DB_PATH", (BASE_DIR / "outputs" / "job_queue.db").as_posix()))
+)
+_job_service.register_handler("pipeline_run", lambda _: _risk_service.run_pipeline().__dict__)
+_job_service.register_handler("refresh_plan", lambda _: _risk_service.refresh_plan_from_feedback().__dict__)
+_job_service.start_worker()
 _login_rate_limiter = SlidingWindowRateLimiter(
     limit=int(os.getenv("LOGIN_RATE_LIMIT", "30")),
     window_seconds=int(os.getenv("LOGIN_RATE_LIMIT_WINDOW_SECONDS", "60")),
@@ -340,14 +345,10 @@ def run_pipeline(
 @app.post("/api/v1/jobs/pipeline/run", response_model=JobSubmitResponse, status_code=202, tags=["Jobs"])
 def run_pipeline_async(
     current_user: TokenData = Depends(get_current_user),
-    service: RiskService = Depends(get_risk_service),
     jobs: JobService = Depends(get_job_service),
 ):
     require_role(current_user.role, "admin")
-    state = jobs.submit(
-        job_type="pipeline_run",
-        runner=lambda: service.run_pipeline().__dict__,
-    )
+    state = jobs.submit(job_type="pipeline_run", payload={})
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,
@@ -364,14 +365,10 @@ def run_pipeline_async(
 )
 def refresh_plan_async(
     current_user: TokenData = Depends(get_current_user),
-    service: RiskService = Depends(get_risk_service),
     jobs: JobService = Depends(get_job_service),
 ):
     require_role(current_user.role, "admin")
-    state = jobs.submit(
-        job_type="refresh_plan",
-        runner=lambda: service.refresh_plan_from_feedback().__dict__,
-    )
+    state = jobs.submit(job_type="refresh_plan", payload={})
     return JobSubmitResponse(
         job_id=state.job_id,
         job_type=state.job_type,
