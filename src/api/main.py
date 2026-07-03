@@ -4,6 +4,7 @@ Loan Default Risk API — FastAPI application.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, status
@@ -38,16 +39,25 @@ def get_risk_service() -> RiskService:
 def _raise_not_found(exc: NotFoundError) -> None:
     raise HTTPException(status_code=404, detail=str(exc))
 
+
+def _get_cors_origins() -> list[str]:
+    configured = os.getenv("CORS_ALLOW_ORIGINS", "http://localhost:3000,http://localhost:8501")
+    origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000", "http://localhost:8501"]
+
 app = FastAPI(
     title="Loan Default Risk",
     description="Collection operations, risk scoring, and visit planning for field officers.",
     version="1.0.0",
 )
 
+_cors_origins = _get_cors_origins()
+_allow_credentials = "*" not in _cors_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

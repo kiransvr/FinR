@@ -12,7 +12,18 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production-use-a-long-random-secret")
+APP_ENV = os.getenv("APP_ENV", "development").lower()
+DEFAULT_DEV_SECRET = "change-me-in-production-use-a-long-random-secret"
+
+
+def _load_secret_key() -> str:
+    secret = os.getenv("SECRET_KEY", DEFAULT_DEV_SECRET)
+    if APP_ENV in {"prod", "production"} and secret == DEFAULT_DEV_SECRET:
+        raise RuntimeError("SECRET_KEY must be set in production environment")
+    return secret
+
+
+SECRET_KEY = _load_secret_key()
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
@@ -20,16 +31,25 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 bearer_scheme = HTTPBearer()
 
 # ── Demo user store (replace with DB in production) ───────────────────────────
-_PLAIN_USERS: dict[str, dict] = {
-    os.getenv("ADMIN_USERNAME", "admin"): {
-        "plain_password": os.getenv("ADMIN_PASSWORD", "changeme"),
-        "role": "admin",
-    },
-    "field_officer": {
-        "plain_password": "officer123",
-        "role": "officer",
-    },
-}
+def _load_plain_users() -> dict[str, dict]:
+    users: dict[str, dict] = {
+        os.getenv("ADMIN_USERNAME", "admin"): {
+            "plain_password": os.getenv("ADMIN_PASSWORD", "changeme"),
+            "role": "admin",
+        }
+    }
+
+    enable_demo_officer = os.getenv("ENABLE_DEMO_OFFICER_USER", "true").lower() == "true"
+    if enable_demo_officer:
+        users[os.getenv("OFFICER_USERNAME", "field_officer")] = {
+            "plain_password": os.getenv("OFFICER_PASSWORD", "officer123"),
+            "role": "officer",
+        }
+
+    return users
+
+
+_PLAIN_USERS: dict[str, dict] = _load_plain_users()
 _HASHED_USERS: dict[str, dict] = {}
 
 

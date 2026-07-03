@@ -57,6 +57,17 @@ Runtime entry points:
 
 In the dashboard, use the sidebar upload control to replace the active input file and run the pipeline from the UI.
 
+## Security configuration
+
+The API supports environment-driven security settings:
+
+- `SECRET_KEY`: JWT signing key. Required for production (`APP_ENV=production`).
+- `APP_ENV`: `development` (default) or `production`.
+- `CORS_ALLOW_ORIGINS`: comma-separated trusted origins (default: `http://localhost:3000,http://localhost:8501`).
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD`: admin credentials for demo auth.
+- `ENABLE_DEMO_OFFICER_USER`: set to `false` to disable the seeded officer user.
+- `OFFICER_USERNAME`, `OFFICER_PASSWORD`: optional demo officer credentials.
+
 ## Quick start
 
 ```powershell
