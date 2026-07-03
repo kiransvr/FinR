@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 import logging
 import os
 from pathlib import Path
+from typing import cast
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,6 +43,9 @@ from src.api.schemas import (
     JobSubmitResponse,
     JobStatusResponse,
     JobListResponse,
+    JobStatsResponse,
+    JobStatsCounts,
+    JobStatsOldest,
     JobCleanupResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
@@ -409,6 +413,37 @@ def list_jobs(
         for state in states
     ]
     return JobListResponse(total=len(records), records=records)
+
+
+@app.get("/api/v1/jobs/stats", response_model=JobStatsResponse, tags=["Jobs"])
+def get_job_stats(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    stats = jobs.get_job_stats()
+    counts = cast(dict[str, int], stats["counts"])
+    oldest = cast(dict[str, str | None], stats["oldest"])
+    return JobStatsResponse(
+        status="success",
+        counts=JobStatsCounts(
+            queued=int(counts["queued"]),
+            running=int(counts["running"]),
+            succeeded=int(counts["succeeded"]),
+            dead_letter=int(counts["dead_letter"]),
+            canceled=int(counts["canceled"]),
+            total=int(counts["total"]),
+        ),
+        oldest=JobStatsOldest(
+            queued=oldest["queued"],
+            running=oldest["running"],
+            dead_letter=oldest["dead_letter"],
+        ),
+    )
 
 
 @app.get("/api/v1/jobs/{job_id}", response_model=JobStatusResponse, tags=["Jobs"])

@@ -322,3 +322,24 @@ def test_list_jobs_endpoint_returns_records() -> None:
     payload = response.json()
     assert isinstance(payload["total"], int)
     assert isinstance(payload["records"], list)
+
+
+def test_job_stats_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/stats",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_stats_endpoint_returns_counts() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/stats",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["counts"]["total"], int)

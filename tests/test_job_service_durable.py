@@ -281,3 +281,25 @@ def test_list_jobs_respects_limit(tmp_path: Path) -> None:
 
     limited = service.list_jobs(limit=2)
     assert len(limited) == 2
+
+
+def test_get_job_stats_returns_counts(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("stats_job", lambda _: {"ok": True})
+
+    queued = service.submit("stats_job", payload={})
+    canceled = service.submit("stats_job", payload={})
+    canceled_state = service.cancel_queued_job(canceled.job_id)
+
+    assert canceled_state is not None
+    assert canceled_state.status == "canceled"
+
+    stats = service.get_job_stats()
+    counts = stats["counts"]
+    assert counts["total"] >= 2
+    assert counts["queued"] >= 1
+    assert counts["canceled"] >= 1
+
+    oldest = stats["oldest"]
+    assert oldest["queued"] is not None

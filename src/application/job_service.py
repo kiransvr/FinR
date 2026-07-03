@@ -152,6 +152,42 @@ class JobService:
 
         return [self._row_to_state(row) for row in rows]
 
+    def get_job_stats(self) -> dict[str, object]:
+        with self._connect() as conn:
+            count_rows = conn.execute(
+                """
+                SELECT status, COUNT(*)
+                FROM job_queue
+                GROUP BY status
+                """
+            ).fetchall()
+            oldest_rows = conn.execute(
+                """
+                SELECT status, MIN(created_at)
+                FROM job_queue
+                WHERE status IN ('queued', 'running', 'dead_letter')
+                GROUP BY status
+                """
+            ).fetchall()
+
+        counts = {str(row[0]): int(row[1]) for row in count_rows}
+        oldest = {str(row[0]): str(row[1]) for row in oldest_rows if row[1]}
+        return {
+            "counts": {
+                "queued": counts.get("queued", 0),
+                "running": counts.get("running", 0),
+                "succeeded": counts.get("succeeded", 0),
+                "dead_letter": counts.get("dead_letter", 0),
+                "canceled": counts.get("canceled", 0),
+                "total": sum(counts.values()),
+            },
+            "oldest": {
+                "queued": oldest.get("queued"),
+                "running": oldest.get("running"),
+                "dead_letter": oldest.get("dead_letter"),
+            },
+        }
+
     def requeue_dead_letter(self, job_id: str) -> JobState | None:
         with self._lock:
             with self._connect() as conn:
