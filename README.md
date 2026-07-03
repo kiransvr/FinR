@@ -75,6 +75,10 @@ Operational docs:
 - `docs/operations/INCIDENT_RUNBOOK.md`
 - `docs/operations/RELEASE_CHECKLIST.md`
 
+API governance docs:
+
+- `docs/architecture/API_CONTRACT_GOVERNANCE.md`
+
 ## Quick start
 
 ```powershell
