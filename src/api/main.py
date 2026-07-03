@@ -10,11 +10,12 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.application.access_policy import AuthorizationError, require_role
 from src.application.contracts import FeedbackSubmission
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
-    authenticate_user, create_access_token, get_current_user, require_admin,
+    authenticate_user, create_access_token, get_current_user,
 )
 from src.api.schemas import (
     HealthResponse, LoginRequest as SchemaLoginRequest, TokenResponse,
@@ -174,10 +175,11 @@ def submit_feedback(
 
 @app.post("/api/v1/feedback/refresh-plan", response_model=PlanRefreshResponse, tags=["Feedback"])
 def refresh_plan_from_feedback(
-    _: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user),
     service: RiskService = Depends(get_risk_service),
 ):
     try:
+        require_role(current_user.role, "admin")
         result = service.refresh_plan_from_feedback()
         return PlanRefreshResponse(
             status="success",
@@ -186,6 +188,8 @@ def refresh_plan_from_feedback(
             officer_kpi_rows=result.officer_kpi_rows,
             feedback_rows=result.feedback_rows,
         )
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
     except NotFoundError as exc:
         _raise_not_found(exc)
     except Exception as exc:
@@ -197,11 +201,12 @@ def refresh_plan_from_feedback(
 
 @app.post("/api/v1/pipeline/run", response_model=PipelineRunResponse, tags=["Pipeline"])
 def run_pipeline(
-    _: TokenData = Depends(require_admin),
+    current_user: TokenData = Depends(get_current_user),
     service: RiskService = Depends(get_risk_service),
 ):
     """Trigger the full pipeline (admin only). Retrains model and refreshes all outputs."""
     try:
+        require_role(current_user.role, "admin")
         result = service.run_pipeline()
         return PipelineRunResponse(
             status="success",
@@ -211,6 +216,8 @@ def run_pipeline(
             visit_plan_rows=result.visit_plan_rows,
             officer_kpi_rows=result.officer_kpi_rows,
         )
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
     except Exception as exc:
         logger.exception("Pipeline run failed")
         raise HTTPException(status_code=500, detail=str(exc))
