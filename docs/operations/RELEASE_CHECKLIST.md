@@ -14,7 +14,7 @@
 
 3. Configuration Readiness
 - [ ] Production env vars validated (`APP_ENV`, `SECRET_KEY`, `ADMIN_PASSWORD`, `CORS_ALLOW_ORIGINS`).
-- [ ] `OUTPUT_STORE_ADAPTER` confirmed (`csv` or approved migration target).
+- [ ] `OUTPUT_STORE_ADAPTER` confirmed (`csv` or `db`).
 - [ ] Login rate limit settings reviewed for release traffic.
 
 4. Data and Output Readiness

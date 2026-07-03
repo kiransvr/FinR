@@ -37,7 +37,7 @@ Provide a repeatable response process for production incidents affecting API ava
 3. Data outputs:
    - Validate existence and freshness of scored outputs under `outputs/`.
 4. Adapter mode:
-   - Confirm `OUTPUT_STORE_ADAPTER` currently in use (`csv` or `db_stub`).
+   - Confirm `OUTPUT_STORE_ADAPTER` currently in use (`csv` or `db`).
 5. Logs and traceability:
    - Correlate failing requests using `X-Request-ID`.
 

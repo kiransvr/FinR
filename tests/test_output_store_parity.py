@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.config import ProjectConfig
-from src.infrastructure.db_output_repository import DbOutputRepositoryStub
+from src.infrastructure.db_output_repository import DbOutputRepository
 from src.infrastructure.output_repository import OutputRepository
 
 
@@ -14,7 +14,7 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
     pd.DataFrame(rows).to_csv(path, index=False)
 
 
-def test_csv_and_db_stub_adapters_return_same_shapes(tmp_path: Path) -> None:
+def test_csv_and_db_adapters_return_same_shapes(tmp_path: Path) -> None:
     config = ProjectConfig(base_dir=tmp_path)
 
     _write_csv(config.scored_output_path, [{"AccountId": "A1", "Risk": 0.8}])
@@ -26,31 +26,31 @@ def test_csv_and_db_stub_adapters_return_same_shapes(tmp_path: Path) -> None:
     config.model_output_path.touch()
 
     csv_adapter = OutputRepository(config)
-    db_stub_adapter = DbOutputRepositoryStub(config)
+    db_adapter = DbOutputRepository(config)
 
     pairs = [
-        (csv_adapter.scored_output_path, db_stub_adapter.scored_output_path),
-        (csv_adapter.top_risky_output_path, db_stub_adapter.top_risky_output_path),
-        (csv_adapter.visit_plan_output_path, db_stub_adapter.visit_plan_output_path),
-        (csv_adapter.officer_kpi_output_path, db_stub_adapter.officer_kpi_output_path),
+        (csv_adapter.scored_output_path, db_adapter.scored_output_path),
+        (csv_adapter.top_risky_output_path, db_adapter.top_risky_output_path),
+        (csv_adapter.visit_plan_output_path, db_adapter.visit_plan_output_path),
+        (csv_adapter.officer_kpi_output_path, db_adapter.officer_kpi_output_path),
     ]
 
     for csv_path, db_path in pairs:
         csv_df = csv_adapter.read_csv(csv_path)
-        db_df = db_stub_adapter.read_csv(db_path)
+        db_df = db_adapter.read_csv(db_path)
         assert list(csv_df.columns) == list(db_df.columns)
 
     csv_feedback = csv_adapter.read_feedback_log()
-    db_feedback = db_stub_adapter.read_feedback_log()
+    db_feedback = db_adapter.read_feedback_log()
     assert list(csv_feedback.columns) == list(db_feedback.columns)
 
-    assert csv_adapter.model_exists() == db_stub_adapter.model_exists()
+    assert csv_adapter.model_exists() == db_adapter.model_exists()
 
 
-def test_csv_and_db_stub_append_feedback_contract_parity(tmp_path: Path) -> None:
+def test_csv_and_db_append_feedback_contract_parity(tmp_path: Path) -> None:
     config = ProjectConfig(base_dir=tmp_path)
     csv_adapter = OutputRepository(config)
-    db_stub_adapter = DbOutputRepositoryStub(config)
+    db_adapter = DbOutputRepository(config)
 
     payload = {
         "AsOfDate": "2026-07-03",
@@ -70,7 +70,7 @@ def test_csv_and_db_stub_append_feedback_contract_parity(tmp_path: Path) -> None
     }
 
     csv_df, csv_saved = csv_adapter.append_feedback(payload)
-    db_df, db_saved = db_stub_adapter.append_feedback(payload)
+    db_df, db_saved = db_adapter.append_feedback(payload)
 
     assert set(csv_df.columns) == set(db_df.columns)
     assert set(csv_saved.keys()) == set(db_saved.keys())

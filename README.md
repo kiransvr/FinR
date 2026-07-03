@@ -67,7 +67,8 @@ The API supports environment-driven security settings:
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD`: admin credentials for demo auth.
 - `ENABLE_DEMO_OFFICER_USER`: set to `false` to disable the seeded officer user.
 - `OFFICER_USERNAME`, `OFFICER_PASSWORD`: optional demo officer credentials.
-- `OUTPUT_STORE_ADAPTER`: output store adapter selector (`csv` default, `db_stub` for migration parity mode).
+- `OUTPUT_STORE_ADAPTER`: output store adapter selector (`csv` default, `db` for SQL-backed mode; `db_stub` kept as compatibility alias).
+- `DB_OUTPUT_DATABASE_URL`: optional SQLAlchemy DB URL for output persistence. Defaults to local SQLite at `outputs/output_store.db`.
 
 Operational docs:
 

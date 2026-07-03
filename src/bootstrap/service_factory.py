@@ -6,7 +6,7 @@ from pathlib import Path
 from src.application.ports import OutputStore
 from src.application.risk_service import RiskService
 from src.config import ProjectConfig
-from src.infrastructure.db_output_repository import DbOutputRepositoryStub
+from src.infrastructure.db_output_repository import DbOutputRepository, DbOutputRepositoryStub
 from src.infrastructure.output_repository import OutputRepository
 
 
@@ -15,7 +15,9 @@ def build_risk_service(base_dir: Path) -> RiskService:
     adapter = os.getenv("OUTPUT_STORE_ADAPTER", "csv").strip().lower()
     output_repository: OutputStore
 
-    if adapter == "db_stub":
+    if adapter == "db":
+        output_repository = DbOutputRepository(config)
+    elif adapter == "db_stub":
         output_repository = DbOutputRepositoryStub(config)
     elif adapter == "csv":
         output_repository = OutputRepository(config)
