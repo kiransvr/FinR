@@ -69,6 +69,12 @@ The API supports environment-driven security settings:
 - `OFFICER_USERNAME`, `OFFICER_PASSWORD`: optional demo officer credentials.
 - `OUTPUT_STORE_ADAPTER`: output store adapter selector (`csv` default, `db_stub` for migration parity mode).
 
+Operational docs:
+
+- `docs/operations/SECURITY_CONFIGURATION_CHECKLIST.md`
+- `docs/operations/INCIDENT_RUNBOOK.md`
+- `docs/operations/RELEASE_CHECKLIST.md`
+
 ## Quick start
 
 ```powershell
