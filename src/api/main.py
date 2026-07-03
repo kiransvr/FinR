@@ -17,6 +17,7 @@ from src.api.auth import (
     TokenData,
     authenticate_user, create_access_token, get_current_user,
 )
+from src.api.observability import install_observability_middleware
 from src.api.schemas import (
     HealthResponse, LoginRequest as SchemaLoginRequest, TokenResponse,
     ScoredAccountsResponse, VisitPlanResponse, OfficerKPIResponse,
@@ -63,6 +64,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+install_observability_middleware(app)
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
 @app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["Auth"])

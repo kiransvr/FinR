@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.api.observability import REQUEST_ID_HEADER
 
 
 client = TestClient(app)
@@ -44,3 +45,10 @@ def test_protected_endpoint_allows_authenticated_call() -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code in (200, 404)
+
+
+def test_request_id_header_is_returned() -> None:
+    request_id = "smoke-test-request-id"
+    response = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: request_id})
+    assert response.status_code == 200
+    assert response.headers.get(REQUEST_ID_HEADER) == request_id
