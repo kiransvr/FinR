@@ -61,6 +61,11 @@ Background job endpoints (admin):
 - `POST /api/v1/jobs/feedback/refresh-plan` to refresh visit plan asynchronously
 - `GET /api/v1/jobs/{job_id}` to check job status and result
 
+Auth security endpoints:
+
+- `POST /api/v1/auth/logout` revokes current bearer token
+- `POST /api/v1/auth/revoke` (admin) revokes a provided bearer token
+
 Observability endpoint (admin):
 
 - `GET /api/v1/metrics` returns Prometheus-compatible API metrics text
@@ -72,6 +77,7 @@ In the dashboard, use the sidebar upload control to replace the active input fil
 The API supports environment-driven security settings:
 
 - `SECRET_KEY`: JWT signing key. Required for production (`APP_ENV=production`).
+- `AUTH_KEY_VERSION`: token key version marker (default `v1`). Increment to invalidate prior token generations.
 - `APP_ENV`: `development` (default) or `production`.
 - `CORS_ALLOW_ORIGINS`: comma-separated trusted origins (default: `http://localhost:3000,http://localhost:8501`).
 - `ADMIN_USERNAME`, `ADMIN_PASSWORD`: admin credentials for demo auth.

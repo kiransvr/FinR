@@ -40,6 +40,39 @@ def test_login_returns_bearer_token_for_admin() -> None:
     assert payload["access_token"]
 
 
+def test_logout_revokes_current_token() -> None:
+    token = _login("admin", "changeme")
+    logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert logout.status_code == 200
+
+    after = client.get(
+        "/api/v1/scored-accounts",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert after.status_code == 401
+
+
+def test_admin_can_revoke_other_token() -> None:
+    admin_token = _login("admin", "changeme")
+    officer_token = _login("field_officer", "officer123")
+
+    revoke = client.post(
+        "/api/v1/auth/revoke",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"token": officer_token},
+    )
+    assert revoke.status_code == 200
+
+    after = client.get(
+        "/api/v1/scored-accounts",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert after.status_code == 401
+
+
 def test_protected_endpoint_requires_token() -> None:
     response = client.get("/api/v1/scored-accounts")
     assert response.status_code == 401

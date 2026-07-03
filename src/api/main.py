@@ -18,7 +18,7 @@ from src.application.job_service import JobService
 from src.application.risk_service import NotFoundError, RiskService
 from src.api.auth import (
     TokenData,
-    authenticate_user, create_access_token, get_current_user,
+    authenticate_user, create_access_token, get_current_user, get_bearer_token, revoke_access_token,
 )
 from src.api.guardrails import enforce_runtime_settings
 from src.api.observability import install_observability_middleware
@@ -31,6 +31,8 @@ from src.api.schemas import (
     LivenessResponse,
     LoginRequest as SchemaLoginRequest,
     TokenResponse,
+    TokenRevokeRequest,
+    AuthActionResponse,
     ScoredAccountsResponse, VisitPlanResponse, OfficerKPIResponse,
     PipelineRunResponse,
     FeedbackSubmissionRequest,
@@ -149,6 +151,27 @@ def login(body: SchemaLoginRequest, request: Request):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_access_token({"sub": user.username, "role": user.role})
     return TokenResponse(access_token=token)
+
+
+@app.post("/api/v1/auth/logout", response_model=AuthActionResponse, tags=["Auth"])
+def logout(
+    _: TokenData = Depends(get_current_user),
+    token: str = Depends(get_bearer_token),
+):
+    if not token or not revoke_access_token(token):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token revocation failed")
+    return AuthActionResponse(status="success", message="Token revoked successfully")
+
+
+@app.post("/api/v1/auth/revoke", response_model=AuthActionResponse, tags=["Auth"])
+def revoke_token(
+    body: TokenRevokeRequest,
+    current_user: TokenData = Depends(get_current_user),
+):
+    require_role(current_user.role, "admin")
+    if not revoke_access_token(body.token):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token revocation failed")
+    return AuthActionResponse(status="success", message="Token revoked successfully")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

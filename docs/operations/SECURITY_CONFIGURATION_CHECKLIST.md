@@ -22,6 +22,8 @@ Baseline controls required before deploying this service to shared or production
 - [ ] Demo officer user disabled in production if not required (`ENABLE_DEMO_OFFICER_USER=false`).
 - [ ] Role checks enforced for admin-only endpoints.
 - [ ] Login rate limits configured for environment capacity.
+- [ ] `AUTH_KEY_VERSION` is set and rotated as part of key lifecycle policy.
+- [ ] Token revocation flow is tested (`/api/v1/auth/logout`, `/api/v1/auth/revoke`).
 
 ## Data Protection
 

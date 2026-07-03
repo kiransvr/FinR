@@ -19,6 +19,15 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class TokenRevokeRequest(BaseModel):
+    token: str
+
+
+class AuthActionResponse(BaseModel):
+    status: str
+    message: str
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 class LivenessResponse(BaseModel):

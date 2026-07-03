@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
+from threading import Lock
+from uuid import uuid4
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -26,6 +28,7 @@ def _load_secret_key() -> str:
 SECRET_KEY = _load_secret_key()
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+AUTH_KEY_VERSION = os.getenv("AUTH_KEY_VERSION", "v1")
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 bearer_scheme = HTTPBearer()
@@ -51,6 +54,8 @@ def _load_plain_users() -> dict[str, dict]:
 
 _PLAIN_USERS: dict[str, dict] = _load_plain_users()
 _HASHED_USERS: dict[str, dict] = {}
+_REVOKED_TOKEN_IDS: set[str] = set()
+_REVOKED_TOKEN_IDS_LOCK = Lock()
 
 
 def _get_hashed_users() -> dict[str, dict]:
@@ -70,6 +75,7 @@ def _get_hashed_users() -> dict[str, dict]:
 class TokenData(BaseModel):
     username: str
     role: str
+    token_id: str | None = None
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -85,9 +91,30 @@ def authenticate_user(username: str, password: str) -> TokenData | None:
 
 def create_access_token(data: dict) -> str:
     payload = data.copy()
+    payload["jti"] = str(uuid4())
+    payload["kid"] = AUTH_KEY_VERSION
+    payload["iat"] = datetime.now(timezone.utc)
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload["exp"] = expire
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def revoke_access_token(token: str) -> bool:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return False
+    token_id = payload.get("jti")
+    if not isinstance(token_id, str) or not token_id:
+        return False
+    with _REVOKED_TOKEN_IDS_LOCK:
+        _REVOKED_TOKEN_IDS.add(token_id)
+    return True
+
+
+def is_token_revoked(token_id: str) -> bool:
+    with _REVOKED_TOKEN_IDS_LOCK:
+        return token_id in _REVOKED_TOKEN_IDS
 
 
 def get_current_user(
@@ -103,11 +130,23 @@ def get_current_user(
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub", "")
         role: str = payload.get("role", "officer")
+        token_id: str = payload.get("jti", "")
+        key_version: str = payload.get("kid", "")
         if not username:
             raise credentials_exception
-        return TokenData(username=username, role=role)
+        if key_version != AUTH_KEY_VERSION:
+            raise credentials_exception
+        if token_id and is_token_revoked(token_id):
+            raise credentials_exception
+        return TokenData(username=username, role=role, token_id=token_id or None)
     except JWTError:
         raise credentials_exception
+
+
+def get_bearer_token(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> str:
+    return credentials.credentials
 
 
 def require_admin(current_user: TokenData = Depends(get_current_user)) -> TokenData:
