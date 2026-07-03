@@ -1,5 +1,16 @@
-# Keep this repository clean before import
-.venv/
 __pycache__/
 *.pyc
+.venv/
 .env
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+models/*.joblib
+outputs/*.csv
+outputs/*.json
+!outputs/.gitkeep
+!models/.gitkeep
+data/processed/*.csv
+!data/processed/.gitkeep
+data/raw/*
+!data/raw/Loan Accounts-Dummy.csv
