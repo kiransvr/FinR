@@ -68,6 +68,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/{job_id}` to check job status and result (`queued`, `running`, `succeeded`, `dead_letter`)
 - `POST /api/v1/jobs/{job_id}/requeue` (admin) to requeue dead-letter jobs
 - `POST /api/v1/jobs/{job_id}/cancel` (admin) to cancel queued jobs
+- `POST /api/v1/jobs/cleanup?older_than_seconds=86400` (admin) to purge terminal jobs from durable queue
 
 Auth security endpoints:
 

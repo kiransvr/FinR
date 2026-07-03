@@ -128,3 +128,9 @@ class JobStatusResponse(BaseModel):
     updated_at: str
     result: dict | None = None
     error: str | None = None
+
+
+class JobCleanupResponse(BaseModel):
+    status: str
+    message: str
+    deleted_count: int

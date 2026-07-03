@@ -200,6 +200,21 @@ class JobService:
 
         return self.get(job_id)
 
+    def cleanup_terminal_jobs(self, older_than_seconds: float = 86400.0) -> int:
+        cutoff_seconds = max(0.0, older_than_seconds)
+        cutoff = self._utc_now_plus_seconds(-cutoff_seconds)
+        with self._lock:
+            with self._connect() as conn:
+                cursor = conn.execute(
+                    """
+                    DELETE FROM job_queue
+                    WHERE status IN ('succeeded', 'dead_letter', 'canceled')
+                      AND updated_at <= ?
+                    """,
+                    (cutoff,),
+                )
+                return max(0, int(cursor.rowcount))
+
     def _worker_loop(self) -> None:
         while not self._stop_event.is_set():
             claimed = self._claim_next_queued_job()

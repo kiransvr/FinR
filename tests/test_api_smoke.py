@@ -239,3 +239,38 @@ def test_cancel_endpoint_rejects_non_queued_job_state() -> None:
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert second_cancel.status_code == 400
+
+
+def test_cleanup_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/cleanup?older_than_seconds=0",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_cleanup_endpoint_returns_deleted_count() -> None:
+    admin_token = _login("admin", "changeme")
+
+    submit = client.post(
+        "/api/v1/jobs/pipeline/run",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert submit.status_code == 202
+    job_id = submit.json()["job_id"]
+
+    cancel = client.post(
+        f"/api/v1/jobs/{job_id}/cancel",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert cancel.status_code in {200, 400}
+
+    cleanup = client.post(
+        "/api/v1/jobs/cleanup?older_than_seconds=0",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert cleanup.status_code == 200
+    payload = cleanup.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["deleted_count"], int)

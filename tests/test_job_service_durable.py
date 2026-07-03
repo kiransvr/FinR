@@ -166,3 +166,32 @@ def test_queued_job_can_be_canceled(tmp_path: Path) -> None:
 
     assert canceled is not None
     assert canceled.status == "canceled"
+
+
+def test_cleanup_removes_terminal_jobs(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("cleanup_me", lambda _: {"ok": True})
+
+    submitted = service.submit("cleanup_me", payload={})
+    canceled = service.cancel_queued_job(submitted.job_id)
+    assert canceled is not None
+    assert canceled.status == "canceled"
+
+    deleted = service.cleanup_terminal_jobs(older_than_seconds=0)
+    assert deleted >= 1
+    assert service.get(submitted.job_id) is None
+
+
+def test_cleanup_does_not_remove_active_jobs(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("keep_me", lambda _: {"ok": True})
+
+    submitted = service.submit("keep_me", payload={})
+    deleted = service.cleanup_terminal_jobs(older_than_seconds=0)
+
+    assert deleted == 0
+    assert service.get(submitted.job_id) is not None
