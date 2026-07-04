@@ -612,6 +612,47 @@ class JobService:
             "signals": failing,
         }
 
+    def get_alert_gate_status(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+        fail_on_warning: bool = False,
+    ) -> dict[str, object]:
+        failing = cast(
+            dict[str, object],
+            self.get_failing_alert_signals(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        severity = str(failing["severity"])
+        breached = bool(failing["breached"])
+        failing_count = cast(int, failing["failing_count"])
+        failing_signals = cast(list[dict[str, object]], failing["signals"])
+
+        pass_gate = severity == "ok" if fail_on_warning else severity != "critical"
+
+        reasons: list[str] = []
+        if failing_signals:
+            for signal in failing_signals:
+                reasons.append(
+                    f"{signal['name']}: {signal['recommendation']}"
+                )
+        if not reasons:
+            reasons.append("All alert signals are within configured thresholds.")
+
+        return {
+            "severity": severity,
+            "breached": breached,
+            "fail_on_warning": fail_on_warning,
+            "pass_gate": pass_gate,
+            "failing_count": failing_count,
+            "reasons": reasons,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

@@ -89,6 +89,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/failing-signals` (admin) to list only breached signals with recommendation text for rapid incident response
 - `GET /api/v1/jobs/alerts/recommendations` (admin) to get action-oriented operational guidance from alert signals
 - `GET /api/v1/jobs/alerts/health` (admin) to expose machine-friendly health (`ok/warning/critical`) for automation gates
+- `GET /api/v1/jobs/alerts/gate` (admin) to return deployment gate pass/fail with explicit failure reasons (`?fail_on_warning=true` for strict mode)
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

@@ -62,6 +62,7 @@ from src.api.schemas import (
     JobAlertSignalRecord,
     JobAlertsFailingSignalsResponse,
     JobFailingAlertSignalRecord,
+    JobAlertsGateResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -903,6 +904,40 @@ def get_job_alerts_health(
         severity=severity,
         healthy=healthy,
         fail_on_warning=fail_on_warning,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate", response_model=JobAlertsGateResponse, tags=["Jobs"])
+def get_job_alerts_gate(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    fail_on_warning: bool = Query(default=False),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    gate = cast(
+        dict[str, object],
+        jobs.get_alert_gate_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            fail_on_warning=fail_on_warning,
+        ),
+    )
+    return JobAlertsGateResponse(
+        status="success",
+        severity=str(gate["severity"]),
+        breached=bool(gate["breached"]),
+        fail_on_warning=bool(gate["fail_on_warning"]),
+        pass_gate=bool(gate["pass_gate"]),
+        failing_count=cast(int, gate["failing_count"]),
+        reasons=cast(list[str], gate["reasons"]),
     )
 
 
