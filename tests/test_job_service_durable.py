@@ -1490,6 +1490,36 @@ def test_get_alert_gate_profile_rollout_summary_is_blocked_when_worker_down(tmp_
     assert int(summary["total_stages"]) == 3
 
 
+def test_get_alert_gate_profile_rollout_policy_returns_thresholds(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    payload = service.get_alert_gate_profile_rollout_policy(policy="strict-prod")
+    assert str(payload["policy"]) == "strict-prod"
+    assert float(payload["queue_age_threshold_seconds"]) == 120.0
+    assert float(payload["dead_letter_window_seconds"]) == 1800.0
+    assert float(payload["dead_letter_threshold_per_minute"]) == 0.2
+    assert str(payload["release_readiness"]) in {
+        "ready_for_prod",
+        "ready_for_staging",
+        "dev_only",
+        "blocked",
+    }
+
+
+def test_get_alert_gate_profile_rollout_policy_rejects_invalid_value(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    try:
+        _ = service.get_alert_gate_profile_rollout_policy(policy="legacy")
+        raise AssertionError("Expected ValueError for invalid policy")
+    except ValueError:
+        pass
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

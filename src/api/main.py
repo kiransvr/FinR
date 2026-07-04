@@ -74,6 +74,7 @@ from src.api.schemas import (
     JobAlertsGateProfileRolloutStage,
     JobAlertsGateProfileRolloutPlanResponse,
     JobAlertsGateProfileRolloutSummaryResponse,
+    JobAlertsGateProfileRolloutPolicyResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1676,6 +1677,43 @@ def check_job_alerts_gate_profile_rollout_summary(
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/rollout/policy", response_model=JobAlertsGateProfileRolloutPolicyResponse, tags=["Jobs"])
+def get_job_alerts_gate_profile_rollout_policy(
+    policy: str = Query(default="balanced", pattern="^(strict-prod|balanced|conservative)$"),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    policy_payload = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_rollout_policy(policy=policy),
+    )
+    return JobAlertsGateProfileRolloutPolicyResponse(
+        status="success",
+        policy=str(policy_payload["policy"]),
+        queue_age_threshold_seconds=cast(float, policy_payload["queue_age_threshold_seconds"]),
+        dead_letter_window_seconds=cast(float, policy_payload["dead_letter_window_seconds"]),
+        dead_letter_threshold_per_minute=cast(float, policy_payload["dead_letter_threshold_per_minute"]),
+        severity=str(policy_payload["severity"]),
+        breached=bool(policy_payload["breached"]),
+        recommended_profile=str(policy_payload["recommended_profile"]),
+        recommended_action=str(policy_payload["recommended_action"]),
+        deployment_allowed=bool(policy_payload["deployment_allowed"]),
+        recommended_status_code=cast(int, policy_payload["recommended_status_code"]),
+        release_readiness=str(policy_payload["release_readiness"]),
+        highest_eligible_profile=cast(str | None, policy_payload["highest_eligible_profile"]),
+        eligible_stages=cast(int, policy_payload["eligible_stages"]),
+        blocked_stages=cast(int, policy_payload["blocked_stages"]),
+        total_stages=cast(int, policy_payload["total_stages"]),
+        blocking_profiles=cast(list[str], policy_payload["blocking_profiles"]),
+        reasons=cast(list[str], policy_payload["reasons"]),
     )
 
 

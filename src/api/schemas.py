@@ -418,6 +418,27 @@ class JobAlertsGateProfileRolloutSummaryResponse(BaseModel):
     reasons: list[str]
 
 
+class JobAlertsGateProfileRolloutPolicyResponse(BaseModel):
+    status: str
+    policy: str
+    queue_age_threshold_seconds: float
+    dead_letter_window_seconds: float
+    dead_letter_threshold_per_minute: float
+    severity: str
+    breached: bool
+    recommended_profile: str
+    recommended_action: str
+    deployment_allowed: bool
+    recommended_status_code: int
+    release_readiness: str
+    highest_eligible_profile: str | None = None
+    eligible_stages: int
+    blocked_stages: int
+    total_stages: int
+    blocking_profiles: list[str]
+    reasons: list[str]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

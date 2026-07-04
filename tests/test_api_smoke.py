@@ -1829,6 +1829,60 @@ def test_job_alerts_gate_profile_rollout_summary_check_endpoint_honors_http_stat
         job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
 
 
+def test_job_alerts_gate_profile_rollout_policy_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/profile/rollout/policy?policy=balanced",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_gate_profile_rollout_policy_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/profile/rollout/policy?policy=balanced",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["policy"] in {"strict-prod", "balanced", "conservative"}
+    assert isinstance(payload["queue_age_threshold_seconds"], float)
+    assert isinstance(payload["dead_letter_window_seconds"], float)
+    assert isinstance(payload["dead_letter_threshold_per_minute"], float)
+    assert payload["release_readiness"] in {
+        "ready_for_prod",
+        "ready_for_staging",
+        "dev_only",
+        "blocked",
+    }
+    assert isinstance(payload["deployment_allowed"], bool)
+
+
+def test_job_alerts_gate_profile_rollout_policy_endpoint_supports_policy_presets() -> None:
+    admin_token = _login("admin", "changeme")
+
+    strict_response = client.get(
+        "/api/v1/jobs/alerts/gate/profile/rollout/policy?policy=strict-prod",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    conservative_response = client.get(
+        "/api/v1/jobs/alerts/gate/profile/rollout/policy?policy=conservative",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert strict_response.status_code == 200
+    assert conservative_response.status_code == 200
+
+    strict_payload = strict_response.json()
+    conservative_payload = conservative_response.json()
+    assert strict_payload["policy"] == "strict-prod"
+    assert conservative_payload["policy"] == "conservative"
+    assert strict_payload["queue_age_threshold_seconds"] == 120.0
+    assert conservative_payload["queue_age_threshold_seconds"] == 240.0
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

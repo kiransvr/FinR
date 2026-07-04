@@ -88,6 +88,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/plan/check` for HTTP-native pass/fail enforcement of rollout plan decisions.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/summary` when release dashboards need a compact readiness verdict and stage counts.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/summary/check` for HTTP-native enforcement of summary readiness in CI/CD.
+- Use `GET /api/v1/jobs/alerts/gate/profile/rollout/policy?policy=strict-prod|balanced|conservative` to apply explicit release policy presets without manually tuning thresholds.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.

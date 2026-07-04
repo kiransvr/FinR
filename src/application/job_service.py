@@ -1049,6 +1049,48 @@ class JobService:
             "reasons": cast(list[str], plan["reasons"]),
         }
 
+    def get_alert_gate_profile_rollout_policy(
+        self,
+        policy: str = "balanced",
+    ) -> dict[str, object]:
+        normalized_policy = policy.strip().lower()
+        policy_map = {
+            "strict-prod": {
+                "queue_age_threshold_seconds": 120.0,
+                "dead_letter_window_seconds": 1800.0,
+                "dead_letter_threshold_per_minute": 0.2,
+            },
+            "balanced": {
+                "queue_age_threshold_seconds": 300.0,
+                "dead_letter_window_seconds": 3600.0,
+                "dead_letter_threshold_per_minute": 1.0,
+            },
+            "conservative": {
+                "queue_age_threshold_seconds": 240.0,
+                "dead_letter_window_seconds": 3600.0,
+                "dead_letter_threshold_per_minute": 0.5,
+            },
+        }
+        if normalized_policy not in policy_map:
+            raise ValueError("policy must be one of: strict-prod, balanced, conservative")
+
+        thresholds = cast(dict[str, float], policy_map[normalized_policy])
+        summary = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_rollout_summary(
+                queue_age_threshold_seconds=float(thresholds["queue_age_threshold_seconds"]),
+                dead_letter_window_seconds=float(thresholds["dead_letter_window_seconds"]),
+                dead_letter_threshold_per_minute=float(thresholds["dead_letter_threshold_per_minute"]),
+            ),
+        )
+        return {
+            "policy": normalized_policy,
+            "queue_age_threshold_seconds": float(thresholds["queue_age_threshold_seconds"]),
+            "dead_letter_window_seconds": float(thresholds["dead_letter_window_seconds"]),
+            "dead_letter_threshold_per_minute": float(thresholds["dead_letter_threshold_per_minute"]),
+            **summary,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
