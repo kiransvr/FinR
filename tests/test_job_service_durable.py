@@ -1127,6 +1127,36 @@ def test_get_alert_gate_policy_advice_prefers_relaxed_on_warning(tmp_path: Path)
         service.get_worker_status = original_get_worker_status
 
 
+def test_get_alert_gate_policy_advice_prefers_strict_when_all_ok(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 0,
+        "drained": True,
+    }
+
+    try:
+        advice = service.get_alert_gate_policy_advice(
+            queue_age_threshold_seconds=300,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        assert str(advice["severity"]) == "ok"
+        assert bool(advice["relaxed_pass"]) is True
+        assert bool(advice["strict_pass"]) is True
+        assert str(advice["recommended_mode"]) == "strict"
+        assert bool(advice["deployment_allowed"]) is True
+        assert int(advice["recommended_status_code"]) == 200
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
 def test_get_alert_gate_policy_advice_blocks_on_critical(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path)
