@@ -82,6 +82,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/dead-letter-rate` (admin) to detect dead-letter growth rate breaches within an observation window
 - `GET /api/v1/jobs/dead-letter-top-types` (admin) to identify job types producing most dead-letter failures
 - `GET /api/v1/jobs/dead-letter-errors` (admin) to identify the most frequent dead-letter error reasons
+- `GET /api/v1/jobs/dead-letter-recent` (admin) to inspect the latest dead-letter incidents and error details
 - `GET /api/v1/jobs/alerts` (admin) to get consolidated queue/worker alert severity in a single response
 - `GET /api/v1/jobs/alerts/recommendations` (admin) to get action-oriented operational guidance from alert signals
 - `GET /api/v1/jobs/alerts/health` (admin) to expose machine-friendly health (`ok/warning/critical`) for automation gates

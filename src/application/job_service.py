@@ -372,6 +372,22 @@ class JobService:
 
         return [self._row_to_state(row) for row in rows]
 
+    def list_recent_dead_letter_jobs(self, limit: int = 20) -> list[JobState]:
+        capped_limit = max(1, min(200, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
+                FROM job_queue
+                WHERE status = 'dead_letter'
+                ORDER BY updated_at DESC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [self._row_to_state(row) for row in rows]
+
     def get_dead_letter_rate_status(
         self,
         window_seconds: float = 3600.0,

@@ -529,6 +529,30 @@ def test_job_dead_letter_errors_endpoint_returns_shape() -> None:
         assert isinstance(first["dead_letter"], int)
 
 
+def test_job_dead_letter_recent_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/dead-letter-recent",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_dead_letter_recent_endpoint_returns_records() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/dead-letter-recent?limit=10",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload["total"], int)
+    assert isinstance(payload["records"], list)
+    if payload["records"]:
+        first = payload["records"][0]
+        assert first["status"] == "dead_letter"
+
+
 def test_job_alerts_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.get(
