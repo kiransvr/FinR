@@ -644,6 +644,51 @@ def test_list_oldest_queued_jobs_returns_oldest_first(tmp_path: Path) -> None:
     assert rows[0].job_id == first.job_id
 
 
+def test_get_dead_letter_rate_status_detects_breach(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("dl_rate", _always_fail)
+    service.start_worker()
+    service.submit("dl_rate", payload={})
+
+    for _ in range(300):
+        stats = service.get_job_stats()
+        counts = stats["counts"]
+        if int(counts["dead_letter"]) >= 1:
+            break
+        time.sleep(0.01)
+
+    rate = service.get_dead_letter_rate_status(window_seconds=60, threshold_per_minute=0.01)
+    assert int(rate["recent_dead_letter"]) >= 1
+    assert bool(rate["breached"]) is True
+
+
+def test_get_dead_letter_rate_status_no_breach_with_high_threshold(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("dl_rate", _always_fail)
+    service.start_worker()
+    service.submit("dl_rate", payload={})
+
+    for _ in range(300):
+        stats = service.get_job_stats()
+        counts = stats["counts"]
+        if int(counts["dead_letter"]) >= 1:
+            break
+        time.sleep(0.01)
+
+    rate = service.get_dead_letter_rate_status(window_seconds=60, threshold_per_minute=1000)
+    assert bool(rate["breached"]) is False
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

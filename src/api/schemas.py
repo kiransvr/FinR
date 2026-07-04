@@ -208,6 +208,16 @@ class JobQueueAgeResponse(BaseModel):
     breached: bool
 
 
+class JobDeadLetterRateResponse(BaseModel):
+    status: str
+    window_seconds: float
+    threshold_per_minute: float
+    recent_dead_letter: int
+    total_dead_letter: int
+    rate_per_minute: float
+    breached: bool
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

@@ -61,6 +61,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Prefer `POST /api/v1/jobs/ensure-worker-alive` for non-disruptive recovery when worker is down but you do not want a forced restart.
 - Use `GET /api/v1/jobs/queue-age?threshold_seconds=300` to detect starvation risk from aged queued jobs.
 - Use `GET /api/v1/jobs/queued-oldest?limit=20` to target the oldest queued work for cancel/requeue decisions.
+- Use `GET /api/v1/jobs/dead-letter-rate?window_seconds=3600&threshold_per_minute=1` to monitor failure acceleration and trigger rapid rollback/escalation.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.

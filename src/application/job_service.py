@@ -372,6 +372,46 @@ class JobService:
 
         return [self._row_to_state(row) for row in rows]
 
+    def get_dead_letter_rate_status(
+        self,
+        window_seconds: float = 3600.0,
+        threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        window = max(1.0, float(window_seconds))
+        threshold = max(0.0, float(threshold_per_minute))
+        cutoff = self._utc_now_plus_seconds(-window)
+
+        with self._connect() as conn:
+            recent_row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter' AND updated_at >= ?
+                """,
+                (cutoff,),
+            ).fetchone()
+            total_row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter'
+                """
+            ).fetchone()
+
+        recent_dead_letter = int(recent_row[0]) if recent_row else 0
+        total_dead_letter = int(total_row[0]) if total_row else 0
+        rate_per_minute = recent_dead_letter / (window / 60.0)
+        breached = rate_per_minute >= threshold
+
+        return {
+            "window_seconds": window,
+            "threshold_per_minute": threshold,
+            "recent_dead_letter": recent_dead_letter,
+            "total_dead_letter": total_dead_letter,
+            "rate_per_minute": rate_per_minute,
+            "breached": breached,
+        }
+
     def get_drain_status(self) -> dict[str, object]:
         stats = self.get_job_stats()
         counts = cast(dict[str, int], stats["counts"])

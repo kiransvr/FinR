@@ -54,6 +54,7 @@ from src.api.schemas import (
     JobWorkerRestartResponse,
     JobWorkerEnsureResponse,
     JobQueueAgeResponse,
+    JobDeadLetterRateResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -561,6 +562,36 @@ def list_oldest_queued_jobs(
         for state in states
     ]
     return JobListResponse(total=len(records), records=records)
+
+
+@app.get("/api/v1/jobs/dead-letter-rate", response_model=JobDeadLetterRateResponse, tags=["Jobs"])
+def get_dead_letter_rate(
+    window_seconds: float = Query(default=3600.0, ge=1.0),
+    threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    rate = cast(
+        dict[str, object],
+        jobs.get_dead_letter_rate_status(
+            window_seconds=window_seconds,
+            threshold_per_minute=threshold_per_minute,
+        ),
+    )
+    return JobDeadLetterRateResponse(
+        status="success",
+        window_seconds=float(cast(float, rate["window_seconds"])),
+        threshold_per_minute=float(cast(float, rate["threshold_per_minute"])),
+        recent_dead_letter=cast(int, rate["recent_dead_letter"]),
+        total_dead_letter=cast(int, rate["total_dead_letter"]),
+        rate_per_minute=float(cast(float, rate["rate_per_minute"])),
+        breached=bool(rate["breached"]),
+    )
 
 
 @app.get("/api/v1/jobs/worker-status", response_model=JobWorkerStatusResponse, tags=["Jobs"])
