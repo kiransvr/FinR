@@ -73,6 +73,7 @@ from src.api.schemas import (
     JobAlertsGateProfileRolloutResponse,
     JobAlertsGateProfileRolloutStage,
     JobAlertsGateProfileRolloutPlanResponse,
+    JobAlertsGateProfileRolloutSummaryResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1583,6 +1584,91 @@ def check_job_alerts_gate_profile_rollout_plan(
             )
             for item in stages
         ],
+    )
+    if payload.deployment_allowed:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/rollout/summary", response_model=JobAlertsGateProfileRolloutSummaryResponse, tags=["Jobs"])
+def get_job_alerts_gate_profile_rollout_summary(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    summary = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_rollout_summary(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    return JobAlertsGateProfileRolloutSummaryResponse(
+        status="success",
+        severity=str(summary["severity"]),
+        breached=bool(summary["breached"]),
+        recommended_profile=str(summary["recommended_profile"]),
+        recommended_action=str(summary["recommended_action"]),
+        deployment_allowed=bool(summary["deployment_allowed"]),
+        recommended_status_code=cast(int, summary["recommended_status_code"]),
+        release_readiness=str(summary["release_readiness"]),
+        highest_eligible_profile=cast(str | None, summary["highest_eligible_profile"]),
+        eligible_stages=cast(int, summary["eligible_stages"]),
+        blocked_stages=cast(int, summary["blocked_stages"]),
+        total_stages=cast(int, summary["total_stages"]),
+        blocking_profiles=cast(list[str], summary["blocking_profiles"]),
+        reasons=cast(list[str], summary["reasons"]),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/rollout/summary/check", response_model=JobAlertsGateProfileRolloutSummaryResponse, tags=["Jobs"])
+def check_job_alerts_gate_profile_rollout_summary(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    summary = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_rollout_summary(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    payload = JobAlertsGateProfileRolloutSummaryResponse(
+        status="success",
+        severity=str(summary["severity"]),
+        breached=bool(summary["breached"]),
+        recommended_profile=str(summary["recommended_profile"]),
+        recommended_action=str(summary["recommended_action"]),
+        deployment_allowed=bool(summary["deployment_allowed"]),
+        recommended_status_code=cast(int, summary["recommended_status_code"]),
+        release_readiness=str(summary["release_readiness"]),
+        highest_eligible_profile=cast(str | None, summary["highest_eligible_profile"]),
+        eligible_stages=cast(int, summary["eligible_stages"]),
+        blocked_stages=cast(int, summary["blocked_stages"]),
+        total_stages=cast(int, summary["total_stages"]),
+        blocking_profiles=cast(list[str], summary["blocking_profiles"]),
+        reasons=cast(list[str], summary["reasons"]),
     )
     if payload.deployment_allowed:
         return payload

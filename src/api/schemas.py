@@ -401,6 +401,23 @@ class JobAlertsGateProfileRolloutPlanResponse(BaseModel):
     stages: list[JobAlertsGateProfileRolloutStage]
 
 
+class JobAlertsGateProfileRolloutSummaryResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    recommended_profile: str
+    recommended_action: str
+    deployment_allowed: bool
+    recommended_status_code: int
+    release_readiness: str
+    highest_eligible_profile: str | None = None
+    eligible_stages: int
+    blocked_stages: int
+    total_stages: int
+    blocking_profiles: list[str]
+    reasons: list[str]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

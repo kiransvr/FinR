@@ -1004,6 +1004,51 @@ class JobService:
             "stages": stages,
         }
 
+    def get_alert_gate_profile_rollout_summary(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        plan = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_rollout_plan(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        stages = cast(list[dict[str, object]], plan["stages"])
+        eligible_stages = sum(1 for item in stages if bool(item["eligible"]))
+        total_stages = len(stages)
+        blocked_stages = total_stages - eligible_stages
+
+        promotion_path = cast(list[str], plan["promotion_path"])
+        highest_eligible_profile: str | None = promotion_path[-1] if promotion_path else None
+        release_readiness = "blocked"
+        if highest_eligible_profile == "prod":
+            release_readiness = "ready_for_prod"
+        elif highest_eligible_profile == "staging":
+            release_readiness = "ready_for_staging"
+        elif highest_eligible_profile == "dev":
+            release_readiness = "dev_only"
+
+        return {
+            "severity": str(plan["severity"]),
+            "breached": bool(plan["breached"]),
+            "recommended_profile": str(plan["recommended_profile"]),
+            "recommended_action": str(plan["recommended_action"]),
+            "deployment_allowed": bool(plan["deployment_allowed"]),
+            "recommended_status_code": cast(int, plan["recommended_status_code"]),
+            "release_readiness": release_readiness,
+            "highest_eligible_profile": highest_eligible_profile,
+            "eligible_stages": eligible_stages,
+            "blocked_stages": blocked_stages,
+            "total_stages": total_stages,
+            "blocking_profiles": cast(list[str], plan["blocking_profiles"]),
+            "reasons": cast(list[str], plan["reasons"]),
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
