@@ -1471,6 +1471,8 @@ def test_get_alert_gate_profile_rollout_summary_prefers_staging_on_warning(tmp_p
         assert int(summary["eligible_stages"]) == 2
         assert int(summary["blocked_stages"]) == 1
         assert int(summary["total_stages"]) == 3
+        assert bool(summary["suppression_active"]) is False
+        assert bool(summary["suppressed"]) is False
     finally:
         service.get_worker_status = original_get_worker_status
 
@@ -1488,6 +1490,62 @@ def test_get_alert_gate_profile_rollout_summary_is_blocked_when_worker_down(tmp_
     assert int(summary["eligible_stages"]) == 0
     assert int(summary["blocked_stages"]) == 3
     assert int(summary["total_stages"]) == 3
+
+
+def test_get_alert_gate_profile_rollout_summary_marks_warning_as_suppressed_when_window_active(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        summary = service.get_alert_gate_profile_rollout_summary(
+            queue_age_threshold_seconds=1,
+            suppress_warning_until="2999-01-01T00:00:00Z",
+            suppression_reason="maintenance-window",
+        )
+        assert str(summary["severity"]) == "warning"
+        assert bool(summary["deployment_allowed"]) is True
+        assert int(summary["recommended_status_code"]) == 200
+        assert bool(summary["suppression_active"]) is True
+        assert bool(summary["suppressed"]) is True
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_profile_rollout_summary_does_not_suppress_critical(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    summary = service.get_alert_gate_profile_rollout_summary(
+        suppress_warning_until="2999-01-01T00:00:00Z",
+        suppression_reason="maintenance-window",
+    )
+    assert str(summary["severity"]) == "critical"
+    assert bool(summary["deployment_allowed"]) is False
+    assert int(summary["recommended_status_code"]) == 503
+    assert bool(summary["suppression_active"]) is True
+    assert bool(summary["suppressed"]) is False
 
 
 def test_get_alert_gate_profile_rollout_policy_returns_thresholds(tmp_path: Path) -> None:

@@ -1600,6 +1600,8 @@ def get_job_alerts_gate_profile_rollout_summary(
     queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
     dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
     dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    suppress_warning_until: str | None = Query(default=None),
+    suppression_reason: str | None = Query(default=None, max_length=200),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
@@ -1614,6 +1616,8 @@ def get_job_alerts_gate_profile_rollout_summary(
             queue_age_threshold_seconds=queue_age_threshold_seconds,
             dead_letter_window_seconds=dead_letter_window_seconds,
             dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            suppress_warning_until=suppress_warning_until,
+            suppression_reason=suppression_reason,
         ),
     )
     return JobAlertsGateProfileRolloutSummaryResponse(
@@ -1631,6 +1635,10 @@ def get_job_alerts_gate_profile_rollout_summary(
         total_stages=cast(int, summary["total_stages"]),
         blocking_profiles=cast(list[str], summary["blocking_profiles"]),
         reasons=cast(list[str], summary["reasons"]),
+        suppression_active=bool(summary["suppression_active"]),
+        suppress_warning_until=cast(str | None, summary["suppress_warning_until"]),
+        suppression_reason=cast(str | None, summary["suppression_reason"]),
+        suppressed=bool(summary["suppressed"]),
     )
 
 
@@ -1639,6 +1647,8 @@ def check_job_alerts_gate_profile_rollout_summary(
     queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
     dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
     dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    suppress_warning_until: str | None = Query(default=None),
+    suppression_reason: str | None = Query(default=None, max_length=200),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
@@ -1653,6 +1663,8 @@ def check_job_alerts_gate_profile_rollout_summary(
             queue_age_threshold_seconds=queue_age_threshold_seconds,
             dead_letter_window_seconds=dead_letter_window_seconds,
             dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            suppress_warning_until=suppress_warning_until,
+            suppression_reason=suppression_reason,
         ),
     )
     payload = JobAlertsGateProfileRolloutSummaryResponse(
@@ -1670,6 +1682,10 @@ def check_job_alerts_gate_profile_rollout_summary(
         total_stages=cast(int, summary["total_stages"]),
         blocking_profiles=cast(list[str], summary["blocking_profiles"]),
         reasons=cast(list[str], summary["reasons"]),
+        suppression_active=bool(summary["suppression_active"]),
+        suppress_warning_until=cast(str | None, summary["suppress_warning_until"]),
+        suppression_reason=cast(str | None, summary["suppression_reason"]),
+        suppressed=bool(summary["suppressed"]),
     )
     if payload.deployment_allowed:
         return payload

@@ -416,6 +416,10 @@ class JobAlertsGateProfileRolloutSummaryResponse(BaseModel):
     total_stages: int
     blocking_profiles: list[str]
     reasons: list[str]
+    suppression_active: bool
+    suppress_warning_until: str | None = None
+    suppression_reason: str | None = None
+    suppressed: bool
 
 
 class JobAlertsGateProfileRolloutPolicyResponse(BaseModel):

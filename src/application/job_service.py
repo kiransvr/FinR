@@ -1009,6 +1009,8 @@ class JobService:
         queue_age_threshold_seconds: float = 300.0,
         dead_letter_window_seconds: float = 3600.0,
         dead_letter_threshold_per_minute: float = 1.0,
+        suppress_warning_until: str | None = None,
+        suppression_reason: str | None = None,
     ) -> dict[str, object]:
         plan = cast(
             dict[str, object],
@@ -1033,13 +1035,32 @@ class JobService:
         elif highest_eligible_profile == "dev":
             release_readiness = "dev_only"
 
+        suppression_active = False
+        if suppress_warning_until:
+            raw_until = suppress_warning_until.strip()
+            if raw_until:
+                parsed = datetime.fromisoformat(raw_until.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                suppression_active = datetime.now(UTC) <= parsed
+
+        deployment_allowed = bool(plan["deployment_allowed"])
+        recommended_status_code = cast(int, plan["recommended_status_code"])
+        suppressed = False
+        severity = str(plan["severity"])
+        if suppression_active and severity == "warning":
+            suppressed = True
+            if not deployment_allowed:
+                deployment_allowed = True
+                recommended_status_code = 200
+
         return {
-            "severity": str(plan["severity"]),
+            "severity": severity,
             "breached": bool(plan["breached"]),
             "recommended_profile": str(plan["recommended_profile"]),
             "recommended_action": str(plan["recommended_action"]),
-            "deployment_allowed": bool(plan["deployment_allowed"]),
-            "recommended_status_code": cast(int, plan["recommended_status_code"]),
+            "deployment_allowed": deployment_allowed,
+            "recommended_status_code": recommended_status_code,
             "release_readiness": release_readiness,
             "highest_eligible_profile": highest_eligible_profile,
             "eligible_stages": eligible_stages,
@@ -1047,6 +1068,10 @@ class JobService:
             "total_stages": total_stages,
             "blocking_profiles": cast(list[str], plan["blocking_profiles"]),
             "reasons": cast(list[str], plan["reasons"]),
+            "suppression_active": suppression_active,
+            "suppress_warning_until": suppress_warning_until,
+            "suppression_reason": suppression_reason,
+            "suppressed": suppressed,
         }
 
     def get_alert_gate_profile_rollout_policy(

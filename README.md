@@ -106,6 +106,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/plan/check` (admin) to enforce rollout plan recommendation via HTTP (`200` pass, `503` fail)
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/summary` (admin) to expose condensed rollout readiness metrics for CI/CD and release dashboards
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/summary/check` (admin) to enforce rollout summary readiness via HTTP (`200` pass, `503` fail)
+- `GET /api/v1/jobs/alerts/gate/profile/rollout/summary[ /check ]` supports `suppress_warning_until` and `suppression_reason` to annotate active maintenance windows while keeping critical failures blocking
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/policy?policy=strict-prod|balanced|conservative` (admin) to evaluate rollout readiness using policy presets and explicit threshold sets
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/policy/check?policy=strict-prod|balanced|conservative` (admin) to enforce policy-based rollout readiness via HTTP (`200` pass, `503` fail)
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing

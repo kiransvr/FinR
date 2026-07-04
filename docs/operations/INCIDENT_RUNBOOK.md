@@ -88,6 +88,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/plan/check` for HTTP-native pass/fail enforcement of rollout plan decisions.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/summary` when release dashboards need a compact readiness verdict and stage counts.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/summary/check` for HTTP-native enforcement of summary readiness in CI/CD.
+- During planned maintenance, include `suppress_warning_until` and `suppression_reason` on rollout summary endpoints to mark warning-level suppression while still blocking critical incidents.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/policy?policy=strict-prod|balanced|conservative` to apply explicit release policy presets without manually tuning thresholds.
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/policy/check?policy=strict-prod|balanced|conservative` for HTTP-native pass/fail enforcement of policy preset decisions.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.

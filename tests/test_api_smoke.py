@@ -1760,6 +1760,10 @@ def test_job_alerts_gate_profile_rollout_summary_endpoint_returns_shape() -> Non
     assert isinstance(payload["total_stages"], int)
     assert isinstance(payload["blocking_profiles"], list)
     assert isinstance(payload["reasons"], list)
+    assert isinstance(payload["suppression_active"], bool)
+    assert payload["suppress_warning_until"] is None or isinstance(payload["suppress_warning_until"], str)
+    assert payload["suppression_reason"] is None or isinstance(payload["suppression_reason"], str)
+    assert isinstance(payload["suppressed"], bool)
 
 
 def test_job_alerts_gate_profile_rollout_summary_check_endpoint_requires_admin_role() -> None:
@@ -1804,11 +1808,13 @@ def test_job_alerts_gate_profile_rollout_summary_check_endpoint_honors_http_stat
     }
     try:
         warn_response = client.get(
-            "/api/v1/jobs/alerts/gate/profile/rollout/summary/check",
+            "/api/v1/jobs/alerts/gate/profile/rollout/summary/check?suppress_warning_until=2999-01-01T00:00:00Z&suppression_reason=maintenance-window",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert warn_response.status_code == 200
         assert warn_response.json()["release_readiness"] == "ready_for_staging"
+        assert warn_response.json()["suppression_active"] is True
+        assert warn_response.json()["suppressed"] is True
 
         job_service.get_worker_status = lambda: {
             "worker_alive": False,
@@ -1818,11 +1824,13 @@ def test_job_alerts_gate_profile_rollout_summary_check_endpoint_honors_http_stat
             "drained": True,
         }
         blocked_response = client.get(
-            "/api/v1/jobs/alerts/gate/profile/rollout/summary/check",
+            "/api/v1/jobs/alerts/gate/profile/rollout/summary/check?suppress_warning_until=2999-01-01T00:00:00Z&suppression_reason=maintenance-window",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert blocked_response.status_code == 503
         assert blocked_response.json()["release_readiness"] == "blocked"
+        assert blocked_response.json()["suppression_active"] is True
+        assert blocked_response.json()["suppressed"] is False
     finally:
         job_service.get_worker_status = original_get_worker_status
         job_service.get_queue_age_status = original_get_queue_age_status
