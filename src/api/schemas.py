@@ -238,6 +238,13 @@ class JobAlertsRecommendationsResponse(BaseModel):
     recommendations: list[str]
 
 
+class JobAlertsHealthResponse(BaseModel):
+    status: str
+    severity: str
+    healthy: bool
+    fail_on_warning: bool
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

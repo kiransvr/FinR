@@ -57,6 +57,7 @@ from src.api.schemas import (
     JobDeadLetterRateResponse,
     JobAlertsSnapshotResponse,
     JobAlertsRecommendationsResponse,
+    JobAlertsHealthResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -692,6 +693,54 @@ def get_job_alert_recommendations(
         status="success",
         severity=severity,
         recommendations=recommendations,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/health", response_model=JobAlertsHealthResponse, tags=["Jobs"])
+def get_job_alerts_health(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    fail_on_warning: bool = Query(default=False),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    worker = cast(dict[str, object], jobs.get_worker_status())
+    queue_age = cast(dict[str, object], jobs.get_queue_age_status(threshold_seconds=queue_age_threshold_seconds))
+    dead_letter_rate = cast(
+        dict[str, object],
+        jobs.get_dead_letter_rate_status(
+            window_seconds=dead_letter_window_seconds,
+            threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+
+    worker_alive = bool(worker["worker_alive"])
+    queue_age_breached = bool(queue_age["breached"])
+    dead_letter_rate_breached = bool(dead_letter_rate["breached"])
+
+    severity = "ok"
+    if (not worker_alive) or dead_letter_rate_breached:
+        severity = "critical"
+    elif queue_age_breached:
+        severity = "warning"
+
+    healthy = severity == "ok"
+    if fail_on_warning:
+        healthy = severity == "ok"
+    else:
+        healthy = severity != "critical"
+
+    return JobAlertsHealthResponse(
+        status="success",
+        severity=severity,
+        healthy=healthy,
+        fail_on_warning=fail_on_warning,
     )
 
 
