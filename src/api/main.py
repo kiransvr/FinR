@@ -941,6 +941,47 @@ def get_job_alerts_gate(
     )
 
 
+@app.get("/api/v1/jobs/alerts/gate/check", response_model=JobAlertsGateResponse, tags=["Jobs"])
+def check_job_alerts_gate(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    fail_on_warning: bool = Query(default=False),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    gate = cast(
+        dict[str, object],
+        jobs.get_alert_gate_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            fail_on_warning=fail_on_warning,
+        ),
+    )
+    payload = JobAlertsGateResponse(
+        status="success",
+        severity=str(gate["severity"]),
+        breached=bool(gate["breached"]),
+        fail_on_warning=bool(gate["fail_on_warning"]),
+        pass_gate=bool(gate["pass_gate"]),
+        failing_count=cast(int, gate["failing_count"]),
+        reasons=cast(list[str], gate["reasons"]),
+    )
+    if payload.pass_gate:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
 @app.get("/api/v1/jobs/worker-status", response_model=JobWorkerStatusResponse, tags=["Jobs"])
 def get_job_worker_status(
     current_user: TokenData = Depends(get_current_user),
