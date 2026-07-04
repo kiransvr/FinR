@@ -479,6 +479,36 @@ def test_job_dead_letter_rate_endpoint_returns_shape() -> None:
     assert isinstance(payload["breached"], bool)
 
 
+def test_job_alerts_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["breached"], bool)
+    assert isinstance(payload["worker_alive"], bool)
+    assert isinstance(payload["paused"], bool)
+    assert isinstance(payload["queued"], int)
+    assert isinstance(payload["running"], int)
+    assert isinstance(payload["queue_age_breached"], bool)
+    assert isinstance(payload["dead_letter_rate_breached"], bool)
+    assert payload["oldest_queued_age_seconds"] is None or isinstance(payload["oldest_queued_age_seconds"], float)
+    assert isinstance(payload["dead_letter_rate_per_minute"], float)
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

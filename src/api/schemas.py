@@ -218,6 +218,20 @@ class JobDeadLetterRateResponse(BaseModel):
     breached: bool
 
 
+class JobAlertsSnapshotResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    worker_alive: bool
+    paused: bool
+    queued: int
+    running: int
+    queue_age_breached: bool
+    dead_letter_rate_breached: bool
+    oldest_queued_age_seconds: float | None = None
+    dead_letter_rate_per_minute: float
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str
