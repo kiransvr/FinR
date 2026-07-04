@@ -335,6 +335,33 @@ def test_stop_worker_prevents_further_processing(tmp_path: Path) -> None:
     assert state.status == "queued"
 
 
+def test_is_worker_alive_reflects_start_and_stop(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("alive_job", lambda _: {"ok": True})
+
+    assert service.is_worker_alive() is False
+    service.start_worker()
+    assert service.is_worker_alive() is True
+
+    service.stop_worker()
+    assert service.is_worker_alive() is False
+
+
+def test_get_worker_status_returns_expected_shape(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("status_job", lambda _: {"ok": True})
+    service.pause_processing()
+
+    status = service.get_worker_status()
+    assert isinstance(status["worker_alive"], bool)
+    assert status["paused"] is True
+    assert isinstance(status["running"], int)
+    assert isinstance(status["queued"], int)
+    assert isinstance(status["drained"], bool)
+
+
 def test_submit_raises_when_queue_capacity_exceeded(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_queued_jobs=1)

@@ -170,6 +170,15 @@ class JobTypeStatsResponse(BaseModel):
     records: list[JobTypeStatsRecord]
 
 
+class JobWorkerStatusResponse(BaseModel):
+    status: str
+    worker_alive: bool
+    paused: bool
+    running: int
+    queued: int
+    drained: bool
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

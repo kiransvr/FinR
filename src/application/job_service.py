@@ -91,6 +91,10 @@ class JobService:
         with self._lock:
             return self._processing_paused
 
+    def is_worker_alive(self) -> bool:
+        with self._lock:
+            return self._worker is not None and self._worker.is_alive()
+
     def submit(
         self,
         job_type: str,
@@ -316,6 +320,17 @@ class JobService:
             "running": running,
             "queued": queued,
             "drained": paused and running == 0,
+        }
+
+    def get_worker_status(self) -> dict[str, object]:
+        drain = self.get_drain_status()
+        typed_drain = cast(dict[str, object], drain)
+        return {
+            "worker_alive": self.is_worker_alive(),
+            "paused": bool(typed_drain["paused"]),
+            "running": cast(int, typed_drain["running"]),
+            "queued": cast(int, typed_drain["queued"]),
+            "drained": bool(typed_drain["drained"]),
         }
 
     def wait_for_drain(self, timeout_seconds: float = 30.0, poll_interval_seconds: float = 0.1) -> dict[str, object]:

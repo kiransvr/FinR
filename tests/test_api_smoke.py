@@ -382,6 +382,31 @@ def test_job_type_stats_endpoint_returns_records() -> None:
         assert isinstance(first["total"], int)
 
 
+def test_job_worker_status_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/worker-status",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_worker_status_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/worker-status",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["worker_alive"], bool)
+    assert isinstance(payload["paused"], bool)
+    assert isinstance(payload["running"], int)
+    assert isinstance(payload["queued"], int)
+    assert isinstance(payload["drained"], bool)
+
+
 def test_pipeline_async_submission_is_deduplicated_by_default() -> None:
     admin_token = _login("admin", "changeme")
     first = client.post(

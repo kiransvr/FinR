@@ -50,6 +50,7 @@ from src.api.schemas import (
     JobStatsOldest,
     JobTypeStatsResponse,
     JobTypeStatsRecord,
+    JobWorkerStatusResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -508,6 +509,27 @@ def get_job_type_stats(
         for row in rows
     ]
     return JobTypeStatsResponse(status="success", records=records)
+
+
+@app.get("/api/v1/jobs/worker-status", response_model=JobWorkerStatusResponse, tags=["Jobs"])
+def get_job_worker_status(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    worker = cast(dict[str, object], jobs.get_worker_status())
+    return JobWorkerStatusResponse(
+        status="success",
+        worker_alive=bool(worker["worker_alive"]),
+        paused=bool(worker["paused"]),
+        running=cast(int, worker["running"]),
+        queued=cast(int, worker["queued"]),
+        drained=bool(worker["drained"]),
+    )
 
 
 @app.get("/api/v1/jobs/drain-status", response_model=JobDrainStatusResponse, tags=["Jobs"])
