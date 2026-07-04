@@ -422,30 +422,66 @@ class JobService:
 
         return self.get(job_id)
 
-    def cancel_queued_jobs(self, job_type: str | None = None) -> int:
+    def cancel_queued_jobs(self, job_type: str | None = None, limit: int | None = None) -> int:
         now = self._utc_now()
+        capped_limit = max(1, min(500, int(limit))) if limit is not None else None
         with self._lock:
             with self._connect() as conn:
+                if capped_limit is None:
+                    if job_type:
+                        cursor = conn.execute(
+                            """
+                            UPDATE job_queue
+                            SET status = ?, next_attempt_at = NULL, updated_at = ?
+                            WHERE status = 'queued' AND job_type = ?
+                            """,
+                            ("canceled", now, job_type),
+                        )
+                    else:
+                        cursor = conn.execute(
+                            """
+                            UPDATE job_queue
+                            SET status = ?, next_attempt_at = NULL, updated_at = ?
+                            WHERE status = 'queued'
+                            """,
+                            ("canceled", now),
+                        )
+                    return max(0, int(cursor.rowcount))
+
                 if job_type:
-                    cursor = conn.execute(
+                    rows = conn.execute(
                         """
-                        UPDATE job_queue
-                        SET status = ?, next_attempt_at = NULL, updated_at = ?
+                        SELECT job_id
+                        FROM job_queue
                         WHERE status = 'queued' AND job_type = ?
+                        ORDER BY created_at ASC
+                        LIMIT ?
                         """,
-                        ("canceled", now, job_type),
-                    )
+                        (job_type, capped_limit),
+                    ).fetchall()
                 else:
-                    cursor = conn.execute(
+                    rows = conn.execute(
+                        """
+                        SELECT job_id
+                        FROM job_queue
+                        WHERE status = 'queued'
+                        ORDER BY created_at ASC
+                        LIMIT ?
+                        """,
+                        (capped_limit,),
+                    ).fetchall()
+
+                for row in rows:
+                    conn.execute(
                         """
                         UPDATE job_queue
                         SET status = ?, next_attempt_at = NULL, updated_at = ?
-                        WHERE status = 'queued'
+                        WHERE status = 'queued' AND job_id = ?
                         """,
-                        ("canceled", now),
+                        ("canceled", now, str(row[0])),
                     )
 
-        return max(0, int(cursor.rowcount))
+        return len(rows)
 
     def cleanup_terminal_jobs(self, older_than_seconds: float = 86400.0) -> int:
         cutoff_seconds = max(0.0, older_than_seconds)

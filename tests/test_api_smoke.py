@@ -542,6 +542,18 @@ def test_bulk_cancel_endpoint_returns_affected_count() -> None:
     assert isinstance(payload["affected_count"], int)
 
 
+def test_bulk_cancel_endpoint_accepts_limit_parameter() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/cancel-queued?limit=1",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["affected_count"], int)
+
+
 def test_drain_status_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.get(

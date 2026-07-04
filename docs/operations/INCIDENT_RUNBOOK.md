@@ -61,6 +61,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `POST /api/v1/jobs/resume?require_drained=true` when you want resume to fail fast unless the queue is fully drained.
 - While paused, async submit endpoints are expected to return HTTP `423 Locked`; resume processing before re-triggering jobs.
 - To quickly drain unsafe backlog, use `POST /api/v1/jobs/cancel-queued` (optionally `?job_type=...`) before controlled recovery.
+- For safer progressive drain, use `POST /api/v1/jobs/cancel-queued?limit=100` (optionally with `job_type`) and repeat in batches.
 - Use `GET /api/v1/jobs/drain-status` to confirm paused mode has no running work before resume or deployment cutover.
 - Use `POST /api/v1/jobs/drain-wait?timeout_seconds=30` to block briefly for drain completion and receive explicit timeout status.
 

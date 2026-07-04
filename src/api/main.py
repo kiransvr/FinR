@@ -665,6 +665,7 @@ def cancel_queued_job(
 @app.post("/api/v1/jobs/cancel-queued", response_model=JobActionCountResponse, tags=["Jobs"])
 def cancel_queued_jobs(
     job_type: str | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=500),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
@@ -673,7 +674,7 @@ def cancel_queued_jobs(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    affected = jobs.cancel_queued_jobs(job_type=job_type)
+    affected = jobs.cancel_queued_jobs(job_type=job_type, limit=limit)
     message = "Queued jobs canceled."
     if job_type:
         message = f"Queued jobs canceled for job_type '{job_type}'."

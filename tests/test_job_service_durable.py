@@ -426,6 +426,25 @@ def test_cancel_queued_jobs_filters_by_job_type(tmp_path: Path) -> None:
     assert b_state is not None and b_state.status == "queued"
 
 
+def test_cancel_queued_jobs_honors_limit(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("bulk_limited", lambda _: {"ok": True})
+
+    first = service.submit("bulk_limited", payload={})
+    second = service.submit("bulk_limited", payload={})
+
+    affected = service.cancel_queued_jobs(limit=1)
+    assert affected == 1
+
+    first_state = service.get(first.job_id)
+    second_state = service.get(second.job_id)
+    assert first_state is not None
+    assert second_state is not None
+    statuses = {first_state.status, second_state.status}
+    assert statuses == {"canceled", "queued"}
+
+
 def test_get_drain_status_reflects_pause_and_running_state(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, poll_interval_seconds=0.01)
