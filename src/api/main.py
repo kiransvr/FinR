@@ -52,6 +52,7 @@ from src.api.schemas import (
     JobActionCountResponse,
     JobDrainStatusResponse,
     JobDrainWaitResponse,
+    JobSafeResumeResponse,
 )
 from src.bootstrap.service_factory import build_risk_service
 
@@ -563,6 +564,38 @@ def resume_job_processing(
 
     jobs.resume_processing()
     return AuthActionResponse(status="success", message="Job processing resumed.")
+
+
+@app.post("/api/v1/jobs/resume-safe", response_model=JobSafeResumeResponse, tags=["Jobs"])
+def safe_resume_job_processing(
+    timeout_seconds: float = Query(default=30.0, ge=0.0, le=300.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    drain = cast(dict[str, object], jobs.wait_for_drain(timeout_seconds=timeout_seconds))
+    timed_out = bool(drain["timed_out"])
+    drained = bool(drain["drained"])
+
+    resumed = False
+    if drained and not timed_out:
+        jobs.resume_processing()
+        resumed = True
+
+    return JobSafeResumeResponse(
+        status="success",
+        resumed=resumed,
+        paused=bool(drain["paused"]),
+        running=cast(int, drain["running"]),
+        queued=cast(int, drain["queued"]),
+        drained=drained,
+        timed_out=timed_out,
+        timeout_seconds=float(cast(float, drain["timeout_seconds"])),
+    )
 
 
 @app.get("/api/v1/jobs/{job_id}", response_model=JobStatusResponse, tags=["Jobs"])

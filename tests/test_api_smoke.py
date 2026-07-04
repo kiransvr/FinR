@@ -487,6 +487,75 @@ def test_resume_with_require_drained_succeeds_when_drained() -> None:
         job_service.resume_processing()
 
 
+def test_resume_safe_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/resume-safe?timeout_seconds=0",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_resume_safe_times_out_without_resuming() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_wait_for_drain = job_service.wait_for_drain
+    job_service.pause_processing()
+    job_service.wait_for_drain = lambda timeout_seconds=30.0: {
+        "paused": True,
+        "running": 1,
+        "queued": 0,
+        "drained": False,
+        "timed_out": True,
+        "timeout_seconds": float(timeout_seconds),
+    }
+    try:
+        response = client.post(
+            "/api/v1/jobs/resume-safe?timeout_seconds=0",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["resumed"] is False
+        assert payload["timed_out"] is True
+    finally:
+        job_service.wait_for_drain = original_wait_for_drain
+        job_service.resume_processing()
+
+
+def test_resume_safe_resumes_when_drain_succeeds() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_wait_for_drain = job_service.wait_for_drain
+    job_service.pause_processing()
+    job_service.wait_for_drain = lambda timeout_seconds=30.0: {
+        "paused": True,
+        "running": 0,
+        "queued": 0,
+        "drained": True,
+        "timed_out": False,
+        "timeout_seconds": float(timeout_seconds),
+    }
+    try:
+        response = client.post(
+            "/api/v1/jobs/resume-safe?timeout_seconds=0",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["resumed"] is True
+        assert payload["drained"] is True
+    finally:
+        job_service.wait_for_drain = original_wait_for_drain
+        job_service.resume_processing()
+
+
 def test_async_submit_returns_423_when_processing_paused() -> None:
     admin_token = _login("admin", "changeme")
 

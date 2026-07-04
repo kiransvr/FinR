@@ -185,3 +185,14 @@ class JobDrainWaitResponse(BaseModel):
     drained: bool
     timed_out: bool
     timeout_seconds: float
+
+
+class JobSafeResumeResponse(BaseModel):
+    status: str
+    resumed: bool
+    paused: bool
+    running: int
+    queued: int
+    drained: bool
+    timed_out: bool
+    timeout_seconds: float
