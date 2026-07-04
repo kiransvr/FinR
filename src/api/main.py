@@ -71,6 +71,8 @@ from src.api.schemas import (
     JobAlertsGateProfileResult,
     JobAlertsGateProfileMatrixResponse,
     JobAlertsGateProfileRolloutResponse,
+    JobAlertsGateProfileRolloutStage,
+    JobAlertsGateProfileRolloutPlanResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1482,6 +1484,105 @@ def check_job_alerts_gate_profile_rollout(
         recommended_status_code=cast(int, rollout["recommended_status_code"]),
         reasons=cast(list[str], rollout["reasons"]),
         profiles=profile_payload,
+    )
+    if payload.deployment_allowed:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/rollout/plan", response_model=JobAlertsGateProfileRolloutPlanResponse, tags=["Jobs"])
+def get_job_alerts_gate_profile_rollout_plan(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    plan = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_rollout_plan(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    stages = cast(list[dict[str, object]], plan["stages"])
+    return JobAlertsGateProfileRolloutPlanResponse(
+        status="success",
+        severity=str(plan["severity"]),
+        breached=bool(plan["breached"]),
+        recommended_profile=str(plan["recommended_profile"]),
+        next_profile=cast(str | None, plan["next_profile"]),
+        recommended_action=str(plan["recommended_action"]),
+        deployment_allowed=bool(plan["deployment_allowed"]),
+        recommended_status_code=cast(int, plan["recommended_status_code"]),
+        reasons=cast(list[str], plan["reasons"]),
+        promotion_path=cast(list[str], plan["promotion_path"]),
+        blocking_profiles=cast(list[str], plan["blocking_profiles"]),
+        stages=[
+            JobAlertsGateProfileRolloutStage(
+                profile=str(item["profile"]),
+                eligible=bool(item["eligible"]),
+                recommended_status_code=cast(int, item["recommended_status_code"]),
+                reasons=cast(list[str], item["reasons"]),
+            )
+            for item in stages
+        ],
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/rollout/plan/check", response_model=JobAlertsGateProfileRolloutPlanResponse, tags=["Jobs"])
+def check_job_alerts_gate_profile_rollout_plan(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    plan = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_rollout_plan(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    stages = cast(list[dict[str, object]], plan["stages"])
+    payload = JobAlertsGateProfileRolloutPlanResponse(
+        status="success",
+        severity=str(plan["severity"]),
+        breached=bool(plan["breached"]),
+        recommended_profile=str(plan["recommended_profile"]),
+        next_profile=cast(str | None, plan["next_profile"]),
+        recommended_action=str(plan["recommended_action"]),
+        deployment_allowed=bool(plan["deployment_allowed"]),
+        recommended_status_code=cast(int, plan["recommended_status_code"]),
+        reasons=cast(list[str], plan["reasons"]),
+        promotion_path=cast(list[str], plan["promotion_path"]),
+        blocking_profiles=cast(list[str], plan["blocking_profiles"]),
+        stages=[
+            JobAlertsGateProfileRolloutStage(
+                profile=str(item["profile"]),
+                eligible=bool(item["eligible"]),
+                recommended_status_code=cast(int, item["recommended_status_code"]),
+                reasons=cast(list[str], item["reasons"]),
+            )
+            for item in stages
+        ],
     )
     if payload.deployment_allowed:
         return payload

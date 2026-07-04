@@ -1381,6 +1381,62 @@ def test_get_alert_gate_profile_rollout_recommendation_blocks_when_worker_down(t
     assert isinstance(rollout["reasons"], list)
 
 
+def test_get_alert_gate_profile_rollout_plan_prefers_staging_on_warning(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        plan = service.get_alert_gate_profile_rollout_plan(queue_age_threshold_seconds=1)
+        assert str(plan["recommended_profile"]) == "staging"
+        assert str(plan["recommended_action"]) == "hold_in_staging"
+        assert plan["promotion_path"] == ["dev", "staging"]
+        blocking_profiles = plan["blocking_profiles"]
+        assert isinstance(blocking_profiles, list)
+        assert "prod" in blocking_profiles
+        stages = plan["stages"]
+        assert isinstance(stages, list)
+        assert len(stages) == 3
+        assert str(stages[0]["profile"]) == "dev"
+        assert str(stages[1]["profile"]) == "staging"
+        assert str(stages[2]["profile"]) == "prod"
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_profile_rollout_plan_blocks_when_worker_down(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    plan = service.get_alert_gate_profile_rollout_plan()
+    assert str(plan["recommended_profile"]) == "block"
+    assert str(plan["recommended_action"]) == "block_release"
+    assert plan["promotion_path"] == []
+    assert plan["next_profile"] is None
+    assert bool(plan["deployment_allowed"]) is False
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

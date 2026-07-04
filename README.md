@@ -102,6 +102,8 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate/profile/matrix/check` (admin) to enforce profile matrix recommendation via HTTP (`200` pass, `503` fail)
 - `GET /api/v1/jobs/alerts/gate/profile/rollout` (admin) to convert profile matrix results into a rollout action (`promote_to_prod`, `hold_in_staging`, `continue_in_dev`, `block_release`)
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/check` (admin) to enforce rollout recommendation via HTTP (`200` pass, `503` fail)
+- `GET /api/v1/jobs/alerts/gate/profile/rollout/plan` (admin) to return stage-by-stage eligibility (`dev`, `staging`, `prod`) and a promotion path
+- `GET /api/v1/jobs/alerts/gate/profile/rollout/plan/check` (admin) to enforce rollout plan recommendation via HTTP (`200` pass, `503` fail)
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

@@ -947,6 +947,63 @@ class JobService:
             "profiles": profiles,
         }
 
+    def get_alert_gate_profile_rollout_plan(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        rollout = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_rollout_recommendation(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        profiles = cast(dict[str, dict[str, object]], rollout["profiles"])
+
+        stages: list[dict[str, object]] = []
+        blocking_profiles: list[str] = []
+        for profile_name in ["dev", "staging", "prod"]:
+            item = profiles[profile_name]
+            pass_gate = bool(item["pass_gate"])
+            if not pass_gate:
+                blocking_profiles.append(profile_name)
+            stages.append(
+                {
+                    "profile": profile_name,
+                    "eligible": pass_gate,
+                    "recommended_status_code": cast(int, item["recommended_status_code"]),
+                    "reasons": cast(list[str], item["reasons"]),
+                }
+            )
+
+        recommended_profile = str(rollout["recommended_profile"])
+        promotion_path: list[str]
+        if recommended_profile == "prod":
+            promotion_path = ["dev", "staging", "prod"]
+        elif recommended_profile == "staging":
+            promotion_path = ["dev", "staging"]
+        elif recommended_profile == "dev":
+            promotion_path = ["dev"]
+        else:
+            promotion_path = []
+
+        return {
+            "severity": str(rollout["severity"]),
+            "breached": bool(rollout["breached"]),
+            "recommended_profile": recommended_profile,
+            "next_profile": cast(str | None, rollout["next_profile"]),
+            "recommended_action": str(rollout["recommended_action"]),
+            "deployment_allowed": bool(rollout["deployment_allowed"]),
+            "recommended_status_code": cast(int, rollout["recommended_status_code"]),
+            "reasons": cast(list[str], rollout["reasons"]),
+            "promotion_path": promotion_path,
+            "blocking_profiles": blocking_profiles,
+            "stages": stages,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
