@@ -803,6 +803,39 @@ class JobService:
             "recommended_mode": normalized_mode,
         }
 
+    def get_alert_gate_profile_evaluation(
+        self,
+        profile: str = "staging",
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        normalized_profile = profile.strip().lower()
+        profile_mode_map = {
+            "prod": "strict",
+            "staging": "advice",
+            "dev": "relaxed",
+        }
+        if normalized_profile not in profile_mode_map:
+            raise ValueError("profile must be one of: prod, staging, dev")
+
+        mode = profile_mode_map[normalized_profile]
+        evaluation = cast(
+            dict[str, object],
+            self.get_alert_gate_evaluation(
+                mode=mode,
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        return {
+            "profile": normalized_profile,
+            "profile_mode": mode,
+            **evaluation,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

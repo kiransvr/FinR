@@ -327,6 +327,21 @@ class JobAlertsGateEvaluateResponse(BaseModel):
     recommended_mode: str
 
 
+class JobAlertsGateProfileResponse(BaseModel):
+    status: str
+    profile: str
+    profile_mode: str
+    severity: str
+    breached: bool
+    mode: str
+    pass_gate: bool
+    deployment_allowed: bool
+    recommended_status_code: int
+    reasons: list[str]
+    effective_fail_on_warning: bool | None = None
+    recommended_mode: str
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

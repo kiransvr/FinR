@@ -1340,6 +1340,100 @@ def test_job_alerts_gate_evaluate_check_endpoint_honors_mode_status_codes() -> N
         job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
 
 
+def test_job_alerts_gate_profile_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/profile?profile=staging",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_gate_profile_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/profile?profile=staging",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["profile"] in {"prod", "staging", "dev"}
+    assert payload["profile_mode"] in {"strict", "advice", "relaxed"}
+    assert payload["mode"] in {"strict", "advice", "relaxed"}
+    assert isinstance(payload["pass_gate"], bool)
+    assert isinstance(payload["deployment_allowed"], bool)
+    assert payload["recommended_status_code"] in {200, 503}
+    assert isinstance(payload["reasons"], list)
+
+
+def test_job_alerts_gate_profile_check_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/profile/check?profile=staging",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_gate_profile_check_endpoint_honors_profile_status_codes() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_get_worker_status = job_service.get_worker_status
+    original_get_queue_age_status = job_service.get_queue_age_status
+    original_get_dead_letter_rate_status = job_service.get_dead_letter_rate_status
+    job_service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 0,
+        "drained": True,
+    }
+    job_service.get_queue_age_status = lambda threshold_seconds=300.0: {
+        "queued": 1,
+        "oldest_queued_at": "2000-01-01T00:00:00Z",
+        "oldest_queued_age_seconds": 999999.0,
+        "threshold_seconds": float(threshold_seconds),
+        "breached": True,
+    }
+    job_service.get_dead_letter_rate_status = lambda window_seconds=3600.0, threshold_per_minute=1.0: {
+        "window_seconds": float(window_seconds),
+        "threshold_per_minute": float(threshold_per_minute),
+        "recent_dead_letter": 0,
+        "total_dead_letter": 0,
+        "rate_per_minute": 0.0,
+        "breached": False,
+    }
+    try:
+        prod_response = client.get(
+            "/api/v1/jobs/alerts/gate/profile/check?profile=prod",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        staging_response = client.get(
+            "/api/v1/jobs/alerts/gate/profile/check?profile=staging",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        dev_response = client.get(
+            "/api/v1/jobs/alerts/gate/profile/check?profile=dev",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert prod_response.status_code == 503
+        assert staging_response.status_code == 200
+        assert dev_response.status_code == 200
+
+        assert prod_response.json()["profile_mode"] == "strict"
+        assert staging_response.json()["profile_mode"] == "advice"
+        assert dev_response.json()["profile_mode"] == "relaxed"
+    finally:
+        job_service.get_worker_status = original_get_worker_status
+        job_service.get_queue_age_status = original_get_queue_age_status
+        job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(
