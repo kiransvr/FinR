@@ -1175,6 +1175,71 @@ def test_get_alert_gate_policy_advice_blocks_on_critical(tmp_path: Path) -> None
     assert int(advice["recommended_status_code"]) == 503
 
 
+def test_get_alert_gate_evaluation_mode_split_on_warning(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        strict_eval = service.get_alert_gate_evaluation(
+            mode="strict",
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        relaxed_eval = service.get_alert_gate_evaluation(
+            mode="relaxed",
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        advice_eval = service.get_alert_gate_evaluation(
+            mode="advice",
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+
+        assert bool(strict_eval["pass_gate"]) is False
+        assert bool(relaxed_eval["pass_gate"]) is True
+        assert bool(advice_eval["pass_gate"]) is True
+        assert str(advice_eval["recommended_mode"]) == "relaxed"
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_evaluation_rejects_invalid_mode(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    try:
+        _ = service.get_alert_gate_evaluation(mode="invalid")
+        raise AssertionError("Expected ValueError for invalid mode")
+    except ValueError:
+        pass
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

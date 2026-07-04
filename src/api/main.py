@@ -66,6 +66,7 @@ from src.api.schemas import (
     JobAlertsGateMatrixResponse,
     JobAlertsGateModeResult,
     JobAlertsGateAdviceResponse,
+    JobAlertsGateEvaluateResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1102,6 +1103,43 @@ def check_job_alerts_gate_advice(
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/evaluate", response_model=JobAlertsGateEvaluateResponse, tags=["Jobs"])
+def get_job_alerts_gate_evaluate(
+    mode: str = Query(default="advice", pattern="^(strict|relaxed|advice)$"),
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    evaluation = cast(
+        dict[str, object],
+        jobs.get_alert_gate_evaluation(
+            mode=mode,
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    return JobAlertsGateEvaluateResponse(
+        status="success",
+        severity=str(evaluation["severity"]),
+        breached=bool(evaluation["breached"]),
+        mode=str(evaluation["mode"]),
+        pass_gate=bool(evaluation["pass_gate"]),
+        deployment_allowed=bool(evaluation["deployment_allowed"]),
+        recommended_status_code=cast(int, evaluation["recommended_status_code"]),
+        reasons=cast(list[str], evaluation["reasons"]),
+        effective_fail_on_warning=cast(bool | None, evaluation["effective_fail_on_warning"]),
+        recommended_mode=str(evaluation["recommended_mode"]),
     )
 
 

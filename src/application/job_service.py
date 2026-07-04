@@ -747,6 +747,62 @@ class JobService:
             "reasons": reasons,
         }
 
+    def get_alert_gate_evaluation(
+        self,
+        mode: str = "advice",
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        normalized_mode = mode.strip().lower()
+        if normalized_mode not in {"strict", "relaxed", "advice"}:
+            raise ValueError("mode must be one of: strict, relaxed, advice")
+
+        if normalized_mode == "advice":
+            advice = cast(
+                dict[str, object],
+                self.get_alert_gate_policy_advice(
+                    queue_age_threshold_seconds=queue_age_threshold_seconds,
+                    dead_letter_window_seconds=dead_letter_window_seconds,
+                    dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+                ),
+            )
+            return {
+                "severity": str(advice["severity"]),
+                "breached": bool(advice["breached"]),
+                "mode": normalized_mode,
+                "pass_gate": bool(advice["deployment_allowed"]),
+                "deployment_allowed": bool(advice["deployment_allowed"]),
+                "recommended_status_code": cast(int, advice["recommended_status_code"]),
+                "reasons": cast(list[str], advice["reasons"]),
+                "effective_fail_on_warning": None,
+                "recommended_mode": str(advice["recommended_mode"]),
+            }
+
+        fail_on_warning = normalized_mode == "strict"
+        gate = cast(
+            dict[str, object],
+            self.get_alert_gate_status(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+                fail_on_warning=fail_on_warning,
+            ),
+        )
+        pass_gate = bool(gate["pass_gate"])
+
+        return {
+            "severity": str(gate["severity"]),
+            "breached": bool(gate["breached"]),
+            "mode": normalized_mode,
+            "pass_gate": pass_gate,
+            "deployment_allowed": pass_gate,
+            "recommended_status_code": 200 if pass_gate else 503,
+            "reasons": cast(list[str], gate["reasons"]),
+            "effective_fail_on_warning": fail_on_warning,
+            "recommended_mode": normalized_mode,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

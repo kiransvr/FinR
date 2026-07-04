@@ -1164,6 +1164,98 @@ def test_job_alerts_gate_advice_check_endpoint_returns_503_when_blocked() -> Non
         job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
 
 
+def test_job_alerts_gate_evaluate_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/evaluate?mode=advice",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_gate_evaluate_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/evaluate?mode=advice",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["breached"], bool)
+    assert payload["mode"] in {"strict", "relaxed", "advice"}
+    assert isinstance(payload["pass_gate"], bool)
+    assert isinstance(payload["deployment_allowed"], bool)
+    assert payload["recommended_status_code"] in {200, 503}
+    assert isinstance(payload["reasons"], list)
+    assert all(isinstance(reason, str) for reason in payload["reasons"])
+    assert payload["recommended_mode"] in {"strict", "relaxed", "block"}
+
+
+def test_job_alerts_gate_evaluate_endpoint_honors_mode_split() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_get_worker_status = job_service.get_worker_status
+    original_get_queue_age_status = job_service.get_queue_age_status
+    original_get_dead_letter_rate_status = job_service.get_dead_letter_rate_status
+    job_service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 0,
+        "drained": True,
+    }
+    job_service.get_queue_age_status = lambda threshold_seconds=300.0: {
+        "queued": 1,
+        "oldest_queued_at": "2000-01-01T00:00:00Z",
+        "oldest_queued_age_seconds": 999999.0,
+        "threshold_seconds": float(threshold_seconds),
+        "breached": True,
+    }
+    job_service.get_dead_letter_rate_status = lambda window_seconds=3600.0, threshold_per_minute=1.0: {
+        "window_seconds": float(window_seconds),
+        "threshold_per_minute": float(threshold_per_minute),
+        "recent_dead_letter": 0,
+        "total_dead_letter": 0,
+        "rate_per_minute": 0.0,
+        "breached": False,
+    }
+    try:
+        strict_response = client.get(
+            "/api/v1/jobs/alerts/gate/evaluate?mode=strict",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        relaxed_response = client.get(
+            "/api/v1/jobs/alerts/gate/evaluate?mode=relaxed",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        advice_response = client.get(
+            "/api/v1/jobs/alerts/gate/evaluate?mode=advice",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert strict_response.status_code == 200
+        assert relaxed_response.status_code == 200
+        assert advice_response.status_code == 200
+
+        strict_payload = strict_response.json()
+        relaxed_payload = relaxed_response.json()
+        advice_payload = advice_response.json()
+
+        assert strict_payload["pass_gate"] is False
+        assert relaxed_payload["pass_gate"] is True
+        assert advice_payload["pass_gate"] is True
+        assert advice_payload["recommended_mode"] == "relaxed"
+    finally:
+        job_service.get_worker_status = original_get_worker_status
+        job_service.get_queue_age_status = original_get_queue_age_status
+        job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

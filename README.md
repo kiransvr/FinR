@@ -94,6 +94,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate/matrix` (admin) to compare relaxed vs strict gate outcomes in one response for policy tuning
 - `GET /api/v1/jobs/alerts/gate/advice` (admin) to get a recommended gate policy (`strict`, `relaxed`, or `block`) from current alert signals
 - `GET /api/v1/jobs/alerts/gate/advice/check` (admin) to enforce policy advice via HTTP (`200` when deployment is allowed, `503` when blocked)
+- `GET /api/v1/jobs/alerts/gate/evaluate?mode=strict|relaxed|advice` (admin) to evaluate a specific gate mode from one unified endpoint
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation
