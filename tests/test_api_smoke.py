@@ -553,6 +553,31 @@ def test_job_dead_letter_recent_endpoint_returns_records() -> None:
         assert first["status"] == "dead_letter"
 
 
+def test_job_dead_letter_trend_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/dead-letter-trend",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_dead_letter_trend_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/dead-letter-trend?window_seconds=60",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["window_seconds"], float)
+    assert isinstance(payload["recent_count"], int)
+    assert isinstance(payload["previous_count"], int)
+    assert isinstance(payload["delta"], int)
+    assert payload["direction"] in {"up", "down", "flat"}
+
+
 def test_job_alerts_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.get(

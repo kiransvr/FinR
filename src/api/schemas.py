@@ -265,6 +265,15 @@ class JobDeadLetterErrorsResponse(BaseModel):
     records: list[JobDeadLetterErrorRecord]
 
 
+class JobDeadLetterTrendResponse(BaseModel):
+    status: str
+    window_seconds: float
+    recent_count: int
+    previous_count: int
+    delta: int
+    direction: str
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

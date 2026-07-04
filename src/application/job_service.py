@@ -451,6 +451,50 @@ class JobService:
             for row in rows
         ]
 
+    def get_dead_letter_trend_status(
+        self,
+        window_seconds: float = 3600.0,
+    ) -> dict[str, object]:
+        window = max(1.0, float(window_seconds))
+        recent_cutoff = self._utc_now_plus_seconds(-window)
+        previous_cutoff = self._utc_now_plus_seconds(-(window * 2.0))
+
+        with self._connect() as conn:
+            recent_row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter' AND updated_at >= ?
+                """,
+                (recent_cutoff,),
+            ).fetchone()
+            previous_row = conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter' AND updated_at >= ? AND updated_at < ?
+                """,
+                (previous_cutoff, recent_cutoff),
+            ).fetchone()
+
+        recent_count = int(recent_row[0]) if recent_row else 0
+        previous_count = int(previous_row[0]) if previous_row else 0
+        delta = recent_count - previous_count
+
+        direction = "flat"
+        if delta > 0:
+            direction = "up"
+        elif delta < 0:
+            direction = "down"
+
+        return {
+            "window_seconds": window,
+            "recent_count": recent_count,
+            "previous_count": previous_count,
+            "delta": delta,
+            "direction": direction,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

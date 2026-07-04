@@ -785,6 +785,45 @@ def test_list_recent_dead_letter_jobs_returns_newest_first(tmp_path: Path) -> No
     assert rows[1].job_id == first.job_id
 
 
+def test_get_dead_letter_trend_status_detects_upward_direction(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("trend_job", lambda _: {"ok": True})
+
+    older = service.submit("trend_job", payload={})
+    recent_a = service.submit("trend_job", payload={})
+    recent_b = service.submit("trend_job", payload={})
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', updated_at='2000-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (older.job_id,),
+        )
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', updated_at='2099-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (recent_a.job_id,),
+        )
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', updated_at='2099-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (recent_b.job_id,),
+        )
+
+    trend = service.get_dead_letter_trend_status(window_seconds=3600)
+    assert int(trend["recent_count"]) == 2
+    assert int(trend["previous_count"]) == 0
+    assert int(trend["delta"]) == 2
+    assert str(trend["direction"]) == "up"
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

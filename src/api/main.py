@@ -62,6 +62,7 @@ from src.api.schemas import (
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
     JobDeadLetterErrorsResponse,
+    JobDeadLetterTrendResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -643,6 +644,28 @@ def get_dead_letter_error_summary(
         for row in rows
     ]
     return JobDeadLetterErrorsResponse(status="success", records=records)
+
+
+@app.get("/api/v1/jobs/dead-letter-trend", response_model=JobDeadLetterTrendResponse, tags=["Jobs"])
+def get_dead_letter_trend(
+    window_seconds: float = Query(default=3600.0, ge=1.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    trend = cast(dict[str, object], jobs.get_dead_letter_trend_status(window_seconds=window_seconds))
+    return JobDeadLetterTrendResponse(
+        status="success",
+        window_seconds=float(cast(float, trend["window_seconds"])),
+        recent_count=cast(int, trend["recent_count"]),
+        previous_count=cast(int, trend["previous_count"]),
+        delta=cast(int, trend["delta"]),
+        direction=str(trend["direction"]),
+    )
 
 
 @app.get("/api/v1/jobs/dead-letter-recent", response_model=JobListResponse, tags=["Jobs"])
