@@ -509,6 +509,30 @@ def test_job_alerts_endpoint_returns_shape() -> None:
     assert isinstance(payload["dead_letter_rate_per_minute"], float)
 
 
+def test_job_alerts_recommendations_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/recommendations",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_recommendations_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/recommendations",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["recommendations"], list)
+    assert len(payload["recommendations"]) >= 1
+    assert all(isinstance(item, str) for item in payload["recommendations"])
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

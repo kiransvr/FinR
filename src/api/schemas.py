@@ -232,6 +232,12 @@ class JobAlertsSnapshotResponse(BaseModel):
     dead_letter_rate_per_minute: float
 
 
+class JobAlertsRecommendationsResponse(BaseModel):
+    status: str
+    severity: str
+    recommendations: list[str]
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str
