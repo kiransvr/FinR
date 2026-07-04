@@ -366,6 +366,19 @@ class JobAlertsGateProfileMatrixResponse(BaseModel):
     profiles: dict[str, JobAlertsGateProfileResult]
 
 
+class JobAlertsGateProfileRolloutResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    recommended_profile: str
+    next_profile: str | None = None
+    recommended_action: str
+    deployment_allowed: bool
+    recommended_status_code: int
+    reasons: list[str]
+    profiles: dict[str, JobAlertsGateProfileResult]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

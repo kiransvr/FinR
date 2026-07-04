@@ -899,6 +899,54 @@ class JobService:
             },
         }
 
+    def get_alert_gate_profile_rollout_recommendation(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        matrix = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_matrix_evaluation(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        recommended_profile = str(matrix["recommended_profile"])
+        profiles = cast(dict[str, dict[str, object]], matrix["profiles"])
+
+        next_profile: str | None = None
+        recommended_action = "block_release"
+        if recommended_profile == "prod":
+            next_profile = "prod"
+            recommended_action = "promote_to_prod"
+        elif recommended_profile == "staging":
+            next_profile = "staging"
+            recommended_action = "hold_in_staging"
+        elif recommended_profile == "dev":
+            next_profile = "dev"
+            recommended_action = "continue_in_dev"
+
+        selected_reasons: list[str]
+        if recommended_profile in profiles:
+            selected_reasons = cast(list[str], profiles[recommended_profile]["reasons"])
+        else:
+            selected_reasons = cast(list[str], profiles["prod"]["reasons"])
+
+        return {
+            "severity": str(matrix["severity"]),
+            "breached": bool(matrix["breached"]),
+            "recommended_profile": recommended_profile,
+            "next_profile": next_profile,
+            "recommended_action": recommended_action,
+            "deployment_allowed": bool(matrix["deployment_allowed"]),
+            "recommended_status_code": cast(int, matrix["recommended_status_code"]),
+            "reasons": selected_reasons,
+            "profiles": profiles,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

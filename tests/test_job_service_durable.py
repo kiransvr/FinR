@@ -1330,6 +1330,57 @@ def test_get_alert_gate_profile_matrix_evaluation_recommends_best_profile(tmp_pa
         service.get_worker_status = original_get_worker_status
 
 
+def test_get_alert_gate_profile_rollout_recommendation_prefers_staging_on_warning(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        rollout = service.get_alert_gate_profile_rollout_recommendation(queue_age_threshold_seconds=1)
+        assert str(rollout["recommended_profile"]) == "staging"
+        assert str(rollout["recommended_action"]) == "hold_in_staging"
+        assert str(rollout["next_profile"]) == "staging"
+        assert bool(rollout["deployment_allowed"]) is True
+        assert int(rollout["recommended_status_code"]) == 200
+        assert isinstance(rollout["reasons"], list)
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_profile_rollout_recommendation_blocks_when_worker_down(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    rollout = service.get_alert_gate_profile_rollout_recommendation()
+    assert str(rollout["recommended_profile"]) == "block"
+    assert str(rollout["recommended_action"]) == "block_release"
+    assert rollout["next_profile"] is None
+    assert bool(rollout["deployment_allowed"]) is False
+    assert int(rollout["recommended_status_code"]) == 503
+    assert isinstance(rollout["reasons"], list)
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
