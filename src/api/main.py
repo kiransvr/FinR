@@ -75,6 +75,14 @@ from src.api.schemas import (
     JobAlertsGateProfileRolloutPlanResponse,
     JobAlertsGateProfileRolloutSummaryResponse,
     JobAlertsGateProfileRolloutPolicyResponse,
+    JobAlertIncidentAnnotationRequest,
+    JobAlertIncidentAnnotationRecord,
+    JobAlertIncidentAnnotationResponse,
+    JobAlertIncidentAnnotationListResponse,
+    JobAlertIncidentAnnotationRequest,
+    JobAlertIncidentAnnotationRecord,
+    JobAlertIncidentAnnotationResponse,
+    JobAlertIncidentAnnotationListResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1774,6 +1782,76 @@ def check_job_alerts_gate_profile_rollout_policy(
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=payload.model_dump(),
+    )
+
+
+@app.post("/api/v1/jobs/alerts/incidents/annotate", response_model=JobAlertIncidentAnnotationResponse, tags=["Jobs"])
+def annotate_job_alert_incident(
+    body: JobAlertIncidentAnnotationRequest,
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    annotation = cast(
+        dict[str, object],
+        jobs.add_alert_incident_annotation(
+            summary=body.summary,
+            scope=body.scope,
+            details=body.details,
+            created_by=current_user.username,
+            created_by_role=current_user.role,
+        ),
+    )
+    return JobAlertIncidentAnnotationResponse(
+        status="success",
+        record=JobAlertIncidentAnnotationRecord(
+            annotation_id=str(annotation["annotation_id"]),
+            scope=str(annotation["scope"]),
+            summary=str(annotation["summary"]),
+            details=cast(dict[str, object], annotation["details"]),
+            created_by=str(annotation["created_by"]),
+            created_by_role=str(annotation["created_by_role"]),
+            created_at=str(annotation["created_at"]),
+        ),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/incidents", response_model=JobAlertIncidentAnnotationListResponse, tags=["Jobs"])
+def list_job_alert_incidents(
+    limit: int = Query(default=50, ge=1, le=500),
+    scope: str | None = Query(default=None),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    records = cast(
+        list[dict[str, object]],
+        jobs.list_alert_incident_annotations(limit=limit, scope=scope),
+    )
+    payload = [
+        JobAlertIncidentAnnotationRecord(
+            annotation_id=str(item["annotation_id"]),
+            scope=str(item["scope"]),
+            summary=str(item["summary"]),
+            details=cast(dict[str, object], item["details"]),
+            created_by=str(item["created_by"]),
+            created_by_role=str(item["created_by_role"]),
+            created_at=str(item["created_at"]),
+        )
+        for item in records
+    ]
+    return JobAlertIncidentAnnotationListResponse(
+        status="success",
+        total=len(payload),
+        records=payload,
     )
 
 

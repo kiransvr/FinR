@@ -1578,6 +1578,52 @@ def test_get_alert_gate_profile_rollout_policy_rejects_invalid_value(tmp_path: P
         pass
 
 
+def test_add_alert_incident_annotation_and_list_round_trip(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+
+    created = service.add_alert_incident_annotation(
+        summary="Suppressed warning during maintenance",
+        scope="rollout",
+        details={"ticket": "OPS-123"},
+        created_by="admin",
+        created_by_role="admin",
+    )
+    assert str(created["scope"]) == "rollout"
+    assert str(created["summary"]) == "Suppressed warning during maintenance"
+
+    rows = service.list_alert_incident_annotations(limit=10)
+    assert len(rows) >= 1
+    latest = rows[0]
+    assert str(latest["annotation_id"]) == str(created["annotation_id"])
+    assert str(latest["created_by"]) == "admin"
+    assert isinstance(latest["details"], dict)
+
+
+def test_list_alert_incident_annotations_supports_scope_filter(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+
+    service.add_alert_incident_annotation(
+        summary="Rollout note",
+        scope="rollout",
+        details={},
+        created_by="admin",
+        created_by_role="admin",
+    )
+    service.add_alert_incident_annotation(
+        summary="Canary note",
+        scope="canary",
+        details={},
+        created_by="admin",
+        created_by_role="admin",
+    )
+
+    rollout_rows = service.list_alert_incident_annotations(limit=10, scope="rollout")
+    assert len(rollout_rows) >= 1
+    assert all(str(item["scope"]) == "rollout" for item in rollout_rows)
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

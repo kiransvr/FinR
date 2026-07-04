@@ -1116,6 +1116,99 @@ class JobService:
             **summary,
         }
 
+    def add_alert_incident_annotation(
+        self,
+        summary: str,
+        created_by: str,
+        created_by_role: str,
+        scope: str = "rollout",
+        details: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        normalized_scope = scope.strip().lower() or "rollout"
+        normalized_summary = summary.strip()
+        if not normalized_summary:
+            raise ValueError("summary cannot be empty")
+
+        annotation_id = str(uuid4())
+        created_at = self._utc_now()
+        details_json = json.dumps(details or {})
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO job_alert_incident_annotations(
+                    annotation_id,
+                    scope,
+                    summary,
+                    details_json,
+                    created_by,
+                    created_by_role,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    annotation_id,
+                    normalized_scope,
+                    normalized_summary,
+                    details_json,
+                    created_by,
+                    created_by_role,
+                    created_at,
+                ),
+            )
+
+        return {
+            "annotation_id": annotation_id,
+            "scope": normalized_scope,
+            "summary": normalized_summary,
+            "details": details or {},
+            "created_by": created_by,
+            "created_by_role": created_by_role,
+            "created_at": created_at,
+        }
+
+    def list_alert_incident_annotations(
+        self,
+        limit: int = 50,
+        scope: str | None = None,
+    ) -> list[dict[str, object]]:
+        capped_limit = max(1, min(500, int(limit)))
+        with self._connect() as conn:
+            if scope:
+                rows = conn.execute(
+                    """
+                    SELECT annotation_id, scope, summary, details_json, created_by, created_by_role, created_at
+                    FROM job_alert_incident_annotations
+                    WHERE scope = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (scope.strip().lower(), capped_limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT annotation_id, scope, summary, details_json, created_by, created_by_role, created_at
+                    FROM job_alert_incident_annotations
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (capped_limit,),
+                ).fetchall()
+
+        return [
+            {
+                "annotation_id": str(row[0]),
+                "scope": str(row[1]),
+                "summary": str(row[2]),
+                "details": cast(dict[str, object], json.loads(row[3] or "{}")),
+                "created_by": str(row[4]),
+                "created_by_role": str(row[5]),
+                "created_at": str(row[6]),
+            }
+            for row in rows
+        ]
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
@@ -1562,6 +1655,19 @@ class JobService:
                 conn.execute("ALTER TABLE job_queue ADD COLUMN timeout_seconds REAL NOT NULL DEFAULT 60")
             if "next_attempt_at" not in columns:
                 conn.execute("ALTER TABLE job_queue ADD COLUMN next_attempt_at TEXT")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS job_alert_incident_annotations (
+                    annotation_id TEXT PRIMARY KEY,
+                    scope TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    details_json TEXT,
+                    created_by TEXT NOT NULL,
+                    created_by_role TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
 
     def _execute_with_timeout(self, runner: Callable[[dict], dict], payload: dict, timeout_seconds: float) -> dict:
         future = self._runner_executor.submit(runner, payload)

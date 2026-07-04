@@ -1978,6 +1978,72 @@ def test_job_alerts_gate_profile_rollout_policy_check_endpoint_honors_http_statu
         job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
 
 
+def test_job_alerts_incidents_annotate_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/alerts/incidents/annotate",
+        headers={"Authorization": f"Bearer {officer_token}"},
+        json={"summary": "note", "scope": "rollout", "details": {"k": "v"}},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_incidents_annotate_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/alerts/incidents/annotate",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"summary": "maintenance note", "scope": "rollout", "details": {"ticket": "OPS-999"}},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    record = payload["record"]
+    assert isinstance(record["annotation_id"], str)
+    assert record["scope"] == "rollout"
+    assert record["summary"] == "maintenance note"
+    assert isinstance(record["details"], dict)
+    assert record["created_by"] == "admin"
+    assert record["created_by_role"] == "admin"
+
+
+def test_job_alerts_incidents_list_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/incidents?limit=10",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_incidents_list_endpoint_returns_records_and_supports_scope() -> None:
+    admin_token = _login("admin", "changeme")
+
+    create_rollout = client.post(
+        "/api/v1/jobs/alerts/incidents/annotate",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"summary": "rollout note", "scope": "rollout", "details": {}},
+    )
+    create_canary = client.post(
+        "/api/v1/jobs/alerts/incidents/annotate",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"summary": "canary note", "scope": "canary", "details": {}},
+    )
+    assert create_rollout.status_code == 200
+    assert create_canary.status_code == 200
+
+    response = client.get(
+        "/api/v1/jobs/alerts/incidents?limit=10&scope=rollout",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["total"], int)
+    assert isinstance(payload["records"], list)
+    assert all(record["scope"] == "rollout" for record in payload["records"])
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

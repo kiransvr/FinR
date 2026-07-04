@@ -443,6 +443,33 @@ class JobAlertsGateProfileRolloutPolicyResponse(BaseModel):
     reasons: list[str]
 
 
+class JobAlertIncidentAnnotationRequest(BaseModel):
+    summary: str
+    scope: str = "rollout"
+    details: dict[str, object] | None = None
+
+
+class JobAlertIncidentAnnotationRecord(BaseModel):
+    annotation_id: str
+    scope: str
+    summary: str
+    details: dict[str, object]
+    created_by: str
+    created_by_role: str
+    created_at: str
+
+
+class JobAlertIncidentAnnotationResponse(BaseModel):
+    status: str
+    record: JobAlertIncidentAnnotationRecord
+
+
+class JobAlertIncidentAnnotationListResponse(BaseModel):
+    status: str
+    total: int
+    records: list[JobAlertIncidentAnnotationRecord]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int
