@@ -623,3 +623,16 @@ def test_bulk_dead_letter_requeue_endpoint_returns_affected_count() -> None:
     payload = response.json()
     assert payload["status"] == "success"
     assert isinstance(payload["affected_count"], int)
+
+
+def test_bulk_dead_letter_requeue_endpoint_supports_dry_run() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/requeue-dead-letter?dry_run=true&limit=10",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert "Dry-run" in payload["message"]
+    assert isinstance(payload["affected_count"], int)

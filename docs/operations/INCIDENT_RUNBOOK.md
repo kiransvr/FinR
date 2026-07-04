@@ -49,6 +49,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - If auth abuse is suspected, tighten login rate limits temporarily.
 - If async jobs are failing, inspect dead-letter jobs and requeue after fix using `POST /api/v1/jobs/{job_id}/requeue`.
 - For larger recovery windows, use `POST /api/v1/jobs/requeue-dead-letter?job_type=<type>&limit=100` to requeue dead-letter jobs in controlled batches.
+- Use `dry_run=true` first to preview eligible dead-letter jobs before performing bulk requeue.
 - If an async job was submitted in error and still queued, cancel it via `POST /api/v1/jobs/{job_id}/cancel`.
 - If queue growth is impacting storage or triage clarity, purge old terminal jobs via `POST /api/v1/jobs/cleanup?older_than_seconds=86400`.
 - If worker interruption left jobs stuck in `running`, recover them via `POST /api/v1/jobs/recover-stale?stale_after_seconds=300`.

@@ -343,7 +343,12 @@ class JobService:
 
         return self.get(job_id)
 
-    def requeue_dead_letter_jobs(self, job_type: str | None = None, limit: int = 100) -> int:
+    def requeue_dead_letter_jobs(
+        self,
+        job_type: str | None = None,
+        limit: int = 100,
+        dry_run: bool = False,
+    ) -> int:
         capped_limit = max(1, min(500, int(limit)))
         now = self._utc_now()
         recovered = 0
@@ -377,6 +382,10 @@ class JobService:
                     job_id = str(row[0])
                     dead_letter_job_type = str(row[1])
                     if dead_letter_job_type not in self._handlers:
+                        continue
+
+                    if dry_run:
+                        recovered += 1
                         continue
 
                     conn.execute(

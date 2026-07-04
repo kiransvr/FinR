@@ -618,6 +618,7 @@ def requeue_dead_letter_job(
 def requeue_dead_letter_jobs(
     job_type: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=500),
+    dry_run: bool = Query(default=False),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
@@ -626,10 +627,15 @@ def requeue_dead_letter_jobs(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    affected = jobs.requeue_dead_letter_jobs(job_type=job_type, limit=limit)
+    affected = jobs.requeue_dead_letter_jobs(job_type=job_type, limit=limit, dry_run=dry_run)
     message = "Dead-letter jobs requeued."
+    if dry_run:
+        message = "Dry-run only: dead-letter jobs eligible for requeue."
     if job_type:
-        message = f"Dead-letter jobs requeued for job_type '{job_type}'."
+        if dry_run:
+            message = f"Dry-run only: dead-letter jobs eligible for requeue for job_type '{job_type}'."
+        else:
+            message = f"Dead-letter jobs requeued for job_type '{job_type}'."
     return JobActionCountResponse(status="success", message=message, affected_count=affected)
 
 

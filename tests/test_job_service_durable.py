@@ -540,3 +540,30 @@ def test_requeue_dead_letter_jobs_bulk_honors_limit(tmp_path: Path) -> None:
     service.register_handler("bulk_requeue_limited", lambda _: {"ok": True})
     affected = service.requeue_dead_letter_jobs(job_type="bulk_requeue_limited", limit=1)
     assert affected == 1
+
+
+def test_requeue_dead_letter_jobs_bulk_dry_run_does_not_mutate(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("bulk_requeue_dry", _always_fail)
+    service.start_worker()
+    submitted = service.submit("bulk_requeue_dry", payload={})
+
+    for _ in range(300):
+        state = service.get(submitted.job_id)
+        assert state is not None
+        if state.status == "dead_letter":
+            break
+        time.sleep(0.01)
+
+    service.register_handler("bulk_requeue_dry", lambda _: {"ok": True})
+    affected = service.requeue_dead_letter_jobs(job_type="bulk_requeue_dry", limit=10, dry_run=True)
+    assert affected == 1
+
+    unchanged = service.get(submitted.job_id)
+    assert unchanged is not None
+    assert unchanged.status == "dead_letter"
