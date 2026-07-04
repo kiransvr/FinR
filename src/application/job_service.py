@@ -343,6 +343,54 @@ class JobService:
 
         return self.get(job_id)
 
+    def requeue_dead_letter_jobs(self, job_type: str | None = None, limit: int = 100) -> int:
+        capped_limit = max(1, min(500, int(limit)))
+        now = self._utc_now()
+        recovered = 0
+
+        with self._lock:
+            with self._connect() as conn:
+                if job_type:
+                    rows = conn.execute(
+                        """
+                        SELECT job_id, job_type
+                        FROM job_queue
+                        WHERE status = 'dead_letter' AND job_type = ?
+                        ORDER BY updated_at ASC
+                        LIMIT ?
+                        """,
+                        (job_type, capped_limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT job_id, job_type
+                        FROM job_queue
+                        WHERE status = 'dead_letter'
+                        ORDER BY updated_at ASC
+                        LIMIT ?
+                        """,
+                        (capped_limit,),
+                    ).fetchall()
+
+                for row in rows:
+                    job_id = str(row[0])
+                    dead_letter_job_type = str(row[1])
+                    if dead_letter_job_type not in self._handlers:
+                        continue
+
+                    conn.execute(
+                        """
+                        UPDATE job_queue
+                        SET status = ?, attempts = 0, result_json = NULL, error = NULL, next_attempt_at = ?, updated_at = ?
+                        WHERE job_id = ?
+                        """,
+                        ("queued", now, now, job_id),
+                    )
+                    recovered += 1
+
+        return recovered
+
     def cancel_queued_job(self, job_id: str) -> JobState | None:
         with self._lock:
             with self._connect() as conn:

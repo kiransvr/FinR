@@ -467,3 +467,57 @@ def test_wait_for_drain_times_out_when_not_drained(tmp_path: Path) -> None:
     status = service.wait_for_drain(timeout_seconds=0.05, poll_interval_seconds=0.01)
     assert status["drained"] is False
     assert status["timed_out"] is True
+
+
+def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("bulk_requeue", _always_fail)
+    service.start_worker()
+
+    first = service.submit("bulk_requeue", payload={})
+    second = service.submit("bulk_requeue", payload={})
+
+    for _ in range(300):
+        first_state = service.get(first.job_id)
+        second_state = service.get(second.job_id)
+        assert first_state is not None
+        assert second_state is not None
+        if first_state.status == "dead_letter" and second_state.status == "dead_letter":
+            break
+        time.sleep(0.01)
+
+    service.register_handler("bulk_requeue", lambda _: {"ok": True})
+    affected = service.requeue_dead_letter_jobs(job_type="bulk_requeue", limit=10)
+    assert affected >= 2
+
+
+def test_requeue_dead_letter_jobs_bulk_honors_limit(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
+
+    def _always_fail(_: dict) -> dict:
+        raise RuntimeError("boom")
+
+    service.register_handler("bulk_requeue_limited", _always_fail)
+    service.start_worker()
+
+    first = service.submit("bulk_requeue_limited", payload={})
+    second = service.submit("bulk_requeue_limited", payload={})
+
+    for _ in range(300):
+        first_state = service.get(first.job_id)
+        second_state = service.get(second.job_id)
+        assert first_state is not None
+        assert second_state is not None
+        if first_state.status == "dead_letter" and second_state.status == "dead_letter":
+            break
+        time.sleep(0.01)
+
+    service.register_handler("bulk_requeue_limited", lambda _: {"ok": True})
+    affected = service.requeue_dead_letter_jobs(job_type="bulk_requeue_limited", limit=1)
+    assert affected == 1

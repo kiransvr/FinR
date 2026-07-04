@@ -590,3 +590,24 @@ def test_drain_wait_endpoint_returns_shape() -> None:
     assert isinstance(payload["drained"], bool)
     assert isinstance(payload["timed_out"], bool)
     assert isinstance(payload["timeout_seconds"], float)
+
+
+def test_bulk_dead_letter_requeue_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/requeue-dead-letter",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_bulk_dead_letter_requeue_endpoint_returns_affected_count() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/requeue-dead-letter?limit=10",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["affected_count"], int)

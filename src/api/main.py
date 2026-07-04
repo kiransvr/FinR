@@ -614,6 +614,25 @@ def requeue_dead_letter_job(
     )
 
 
+@app.post("/api/v1/jobs/requeue-dead-letter", response_model=JobActionCountResponse, tags=["Jobs"])
+def requeue_dead_letter_jobs(
+    job_type: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    affected = jobs.requeue_dead_letter_jobs(job_type=job_type, limit=limit)
+    message = "Dead-letter jobs requeued."
+    if job_type:
+        message = f"Dead-letter jobs requeued for job_type '{job_type}'."
+    return JobActionCountResponse(status="success", message=message, affected_count=affected)
+
+
 @app.post("/api/v1/jobs/{job_id}/cancel", response_model=JobStatusResponse, tags=["Jobs"])
 def cancel_queued_job(
     job_id: str,
