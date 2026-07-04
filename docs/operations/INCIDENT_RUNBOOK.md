@@ -57,6 +57,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.
 - Use `POST /api/v1/jobs/pause` before maintenance actions and `POST /api/v1/jobs/resume` after verification to control background execution safely.
+- Use `POST /api/v1/jobs/resume?require_drained=true` when you want resume to fail fast unless the queue is fully drained.
 - While paused, async submit endpoints are expected to return HTTP `423 Locked`; resume processing before re-triggering jobs.
 - To quickly drain unsafe backlog, use `POST /api/v1/jobs/cancel-queued` (optionally `?job_type=...`) before controlled recovery.
 - Use `GET /api/v1/jobs/drain-status` to confirm paused mode has no running work before resume or deployment cutover.

@@ -447,6 +447,46 @@ def test_pause_and_resume_endpoints_toggle_stats_paused_flag() -> None:
     assert resumed_stats.json()["paused"] is False
 
 
+def test_resume_with_require_drained_returns_409_when_not_drained() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_get_drain_status = job_service.get_drain_status
+    job_service.pause_processing()
+    job_service.get_drain_status = lambda: {"paused": True, "running": 1, "queued": 0, "drained": False}
+    try:
+        response = client.post(
+            "/api/v1/jobs/resume?require_drained=true",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 409
+    finally:
+        job_service.get_drain_status = original_get_drain_status
+        job_service.resume_processing()
+
+
+def test_resume_with_require_drained_succeeds_when_drained() -> None:
+    admin_token = _login("admin", "changeme")
+
+    from src.api.main import get_job_service
+
+    job_service = get_job_service()
+    original_get_drain_status = job_service.get_drain_status
+    job_service.pause_processing()
+    job_service.get_drain_status = lambda: {"paused": True, "running": 0, "queued": 0, "drained": True}
+    try:
+        response = client.post(
+            "/api/v1/jobs/resume?require_drained=true",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200
+    finally:
+        job_service.get_drain_status = original_get_drain_status
+        job_service.resume_processing()
+
+
 def test_async_submit_returns_423_when_processing_paused() -> None:
     admin_token = _login("admin", "changeme")
 

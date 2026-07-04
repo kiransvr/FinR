@@ -544,6 +544,7 @@ def pause_job_processing(
 
 @app.post("/api/v1/jobs/resume", response_model=AuthActionResponse, tags=["Jobs"])
 def resume_job_processing(
+    require_drained: bool = Query(default=False),
     current_user: TokenData = Depends(get_current_user),
     jobs: JobService = Depends(get_job_service),
 ):
@@ -551,6 +552,14 @@ def resume_job_processing(
         require_role(current_user.role, "admin")
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
+
+    if require_drained:
+        drain = cast(dict[str, object], jobs.get_drain_status())
+        if not bool(drain["drained"]):
+            raise HTTPException(
+                status_code=409,
+                detail="Queue is not drained; keep processing paused until running jobs complete.",
+            )
 
     jobs.resume_processing()
     return AuthActionResponse(status="success", message="Job processing resumed.")
