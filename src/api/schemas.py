@@ -199,6 +199,15 @@ class JobWorkerEnsureResponse(BaseModel):
     drained: bool
 
 
+class JobQueueAgeResponse(BaseModel):
+    status: str
+    queued: int
+    oldest_queued_at: str | None = None
+    oldest_queued_age_seconds: float | None = None
+    threshold_seconds: float
+    breached: bool
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

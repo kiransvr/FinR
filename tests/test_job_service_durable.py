@@ -591,6 +591,59 @@ def test_get_job_type_stats_returns_aggregated_counts(tmp_path: Path) -> None:
     _ = a
 
 
+def test_get_queue_age_status_detects_breach(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("age_job", lambda _: {"ok": True})
+
+    submitted = service.submit("age_job", payload={})
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET created_at = '2000-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (submitted.job_id,),
+        )
+
+    age = service.get_queue_age_status(threshold_seconds=1)
+    assert int(age["queued"]) >= 1
+    assert bool(age["breached"]) is True
+    assert age["oldest_queued_at"] is not None
+
+
+def test_list_oldest_queued_jobs_returns_oldest_first(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("oldest_job", lambda _: {"ok": True})
+
+    first = service.submit("oldest_job", payload={})
+    second = service.submit("oldest_job", payload={})
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET created_at = '2000-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (first.job_id,),
+        )
+        conn.execute(
+            """
+            UPDATE job_queue
+            SET created_at = '2001-01-01T00:00:00Z'
+            WHERE job_id = ?
+            """,
+            (second.job_id,),
+        )
+
+    rows = service.list_oldest_queued_jobs(limit=2)
+    assert len(rows) == 2
+    assert rows[0].job_id == first.job_id
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

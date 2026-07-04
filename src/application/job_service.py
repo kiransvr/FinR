@@ -326,6 +326,52 @@ class JobService:
             for row in rows
         ]
 
+    def get_queue_age_status(self, threshold_seconds: float = 300.0) -> dict[str, object]:
+        threshold = max(0.0, float(threshold_seconds))
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*), MIN(created_at)
+                FROM job_queue
+                WHERE status = 'queued'
+                """
+            ).fetchone()
+
+        queued = int(row[0]) if row else 0
+        oldest_queued_at = str(row[1]) if row and row[1] else None
+        oldest_age_seconds: float | None = None
+        breached = False
+
+        if oldest_queued_at:
+            oldest_dt = datetime.strptime(oldest_queued_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
+            age = (datetime.now(UTC) - oldest_dt).total_seconds()
+            oldest_age_seconds = max(0.0, age)
+            breached = oldest_age_seconds >= threshold
+
+        return {
+            "queued": queued,
+            "oldest_queued_at": oldest_queued_at,
+            "oldest_queued_age_seconds": oldest_age_seconds,
+            "threshold_seconds": threshold,
+            "breached": breached,
+        }
+
+    def list_oldest_queued_jobs(self, limit: int = 20) -> list[JobState]:
+        capped_limit = max(1, min(200, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT job_id, job_type, status, result_json, error, created_at, updated_at, attempts, max_attempts, timeout_seconds
+                FROM job_queue
+                WHERE status = 'queued'
+                ORDER BY created_at ASC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [self._row_to_state(row) for row in rows]
+
     def get_drain_status(self) -> dict[str, object]:
         stats = self.get_job_stats()
         counts = cast(dict[str, int], stats["counts"])

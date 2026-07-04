@@ -53,6 +53,7 @@ from src.api.schemas import (
     JobWorkerStatusResponse,
     JobWorkerRestartResponse,
     JobWorkerEnsureResponse,
+    JobQueueAgeResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -511,6 +512,55 @@ def get_job_type_stats(
         for row in rows
     ]
     return JobTypeStatsResponse(status="success", records=records)
+
+
+@app.get("/api/v1/jobs/queue-age", response_model=JobQueueAgeResponse, tags=["Jobs"])
+def get_job_queue_age(
+    threshold_seconds: float = Query(default=300.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    age = cast(dict[str, object], jobs.get_queue_age_status(threshold_seconds=threshold_seconds))
+    return JobQueueAgeResponse(
+        status="success",
+        queued=cast(int, age["queued"]),
+        oldest_queued_at=cast(str | None, age["oldest_queued_at"]),
+        oldest_queued_age_seconds=cast(float | None, age["oldest_queued_age_seconds"]),
+        threshold_seconds=float(cast(float, age["threshold_seconds"])),
+        breached=bool(age["breached"]),
+    )
+
+
+@app.get("/api/v1/jobs/queued-oldest", response_model=JobListResponse, tags=["Jobs"])
+def list_oldest_queued_jobs(
+    limit: int = Query(default=20, ge=1, le=200),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    states = jobs.list_oldest_queued_jobs(limit=limit)
+    records = [
+        JobStatusResponse(
+            job_id=state.job_id,
+            job_type=state.job_type,
+            status=state.status,
+            created_at=state.created_at,
+            updated_at=state.updated_at,
+            result=state.result,
+            error=state.error,
+        )
+        for state in states
+    ]
+    return JobListResponse(total=len(records), records=records)
 
 
 @app.get("/api/v1/jobs/worker-status", response_model=JobWorkerStatusResponse, tags=["Jobs"])

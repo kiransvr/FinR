@@ -407,6 +407,52 @@ def test_job_worker_status_endpoint_returns_shape() -> None:
     assert isinstance(payload["drained"], bool)
 
 
+def test_job_queue_age_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/queue-age",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_queue_age_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/queue-age?threshold_seconds=1",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["queued"], int)
+    assert payload["oldest_queued_at"] is None or isinstance(payload["oldest_queued_at"], str)
+    assert payload["oldest_queued_age_seconds"] is None or isinstance(payload["oldest_queued_age_seconds"], float)
+    assert isinstance(payload["threshold_seconds"], float)
+    assert isinstance(payload["breached"], bool)
+
+
+def test_job_queued_oldest_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/queued-oldest?limit=5",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_queued_oldest_endpoint_returns_records() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/queued-oldest?limit=5",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload["total"], int)
+    assert isinstance(payload["records"], list)
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(
