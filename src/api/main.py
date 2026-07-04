@@ -60,6 +60,8 @@ from src.api.schemas import (
     JobAlertsHealthResponse,
     JobAlertsSignalsResponse,
     JobAlertSignalRecord,
+    JobAlertsFailingSignalsResponse,
+    JobFailingAlertSignalRecord,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -775,6 +777,48 @@ def get_job_alert_signals(
         status="success",
         severity=str(status_payload["severity"]),
         breached=bool(status_payload["breached"]),
+        signals=records,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/failing-signals", response_model=JobAlertsFailingSignalsResponse, tags=["Jobs"])
+def get_job_failing_alert_signals(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    status_payload = cast(
+        dict[str, object],
+        jobs.get_failing_alert_signals(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    signal_rows = cast(list[dict[str, object]], status_payload["signals"])
+    records = [
+        JobFailingAlertSignalRecord(
+            name=str(row["name"]),
+            status=str(row["status"]),
+            breached=bool(row["breached"]),
+            details=cast(dict, row["details"]),
+            recommendation=str(row["recommendation"]),
+        )
+        for row in signal_rows
+    ]
+    return JobAlertsFailingSignalsResponse(
+        status="success",
+        severity=str(status_payload["severity"]),
+        breached=bool(status_payload["breached"]),
+        total_signals=cast(int, status_payload["total_signals"]),
+        failing_count=cast(int, status_payload["failing_count"]),
         signals=records,
     )
 

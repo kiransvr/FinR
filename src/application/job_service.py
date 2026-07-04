@@ -567,6 +567,51 @@ class JobService:
             "signals": signals,
         }
 
+    def get_failing_alert_signals(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        status = cast(
+            dict[str, object],
+            self.get_alert_signals_status(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        signals = cast(list[dict[str, object]], status["signals"])
+
+        recommendations = {
+            "worker": "Run POST /api/v1/jobs/ensure-worker-alive; if still down, run POST /api/v1/jobs/restart-worker.",
+            "queue_age": "Inspect GET /api/v1/jobs/queued-oldest and reduce backlog via cancel/requeue in controlled batches.",
+            "dead_letter_rate": "Pause submissions, inspect recent failures, and use dead-letter dry-run before bulk requeue.",
+        }
+
+        failing = []
+        for signal in signals:
+            if not bool(signal["breached"]):
+                continue
+            signal_name = str(signal["name"])
+            failing.append(
+                {
+                    "name": signal_name,
+                    "status": str(signal["status"]),
+                    "breached": True,
+                    "details": cast(dict[str, object], signal["details"]),
+                    "recommendation": recommendations.get(signal_name, "No recommendation available."),
+                }
+            )
+
+        return {
+            "severity": str(status["severity"]),
+            "breached": bool(status["breached"]),
+            "total_signals": len(signals),
+            "failing_count": len(failing),
+            "signals": failing,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

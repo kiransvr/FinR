@@ -259,6 +259,23 @@ class JobAlertsSignalsResponse(BaseModel):
     signals: list[JobAlertSignalRecord]
 
 
+class JobFailingAlertSignalRecord(BaseModel):
+    name: str
+    status: str
+    breached: bool
+    details: dict
+    recommendation: str
+
+
+class JobAlertsFailingSignalsResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    total_signals: int
+    failing_count: int
+    signals: list[JobFailingAlertSignalRecord]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int
