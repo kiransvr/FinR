@@ -836,6 +836,69 @@ class JobService:
             **evaluation,
         }
 
+    def get_alert_gate_profile_matrix_evaluation(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        prod = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_evaluation(
+                profile="prod",
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        staging = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_evaluation(
+                profile="staging",
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        dev = cast(
+            dict[str, object],
+            self.get_alert_gate_profile_evaluation(
+                profile="dev",
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        recommended_profile = "block"
+        deployment_allowed = False
+        recommended_status_code = 503
+        if bool(prod["pass_gate"]):
+            recommended_profile = "prod"
+            deployment_allowed = True
+            recommended_status_code = 200
+        elif bool(staging["pass_gate"]):
+            recommended_profile = "staging"
+            deployment_allowed = True
+            recommended_status_code = 200
+        elif bool(dev["pass_gate"]):
+            recommended_profile = "dev"
+            deployment_allowed = True
+            recommended_status_code = 200
+
+        return {
+            "severity": str(prod["severity"]),
+            "breached": bool(prod["breached"]),
+            "recommended_profile": recommended_profile,
+            "deployment_allowed": deployment_allowed,
+            "recommended_status_code": recommended_status_code,
+            "profiles": {
+                "prod": prod,
+                "staging": staging,
+                "dev": dev,
+            },
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

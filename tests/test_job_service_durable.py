@@ -1292,6 +1292,44 @@ def test_get_alert_gate_profile_evaluation_rejects_invalid_profile(tmp_path: Pat
         pass
 
 
+def test_get_alert_gate_profile_matrix_evaluation_recommends_best_profile(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        matrix = service.get_alert_gate_profile_matrix_evaluation(queue_age_threshold_seconds=1)
+        assert str(matrix["recommended_profile"]) == "staging"
+        assert bool(matrix["deployment_allowed"]) is True
+        profiles = matrix["profiles"]
+        assert isinstance(profiles, dict)
+        assert bool(profiles["prod"]["pass_gate"]) is False
+        assert bool(profiles["staging"]["pass_gate"]) is True
+        assert bool(profiles["dev"]["pass_gate"]) is True
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

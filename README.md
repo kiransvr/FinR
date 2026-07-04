@@ -98,6 +98,8 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate/evaluate/check?mode=strict|relaxed|advice` (admin) to enforce selected mode via HTTP (`200` pass, `503` fail)
 - `GET /api/v1/jobs/alerts/gate/profile?profile=prod|staging|dev` (admin) to evaluate environment policy presets (`prod=strict`, `staging=advice`, `dev=relaxed`)
 - `GET /api/v1/jobs/alerts/gate/profile/check?profile=prod|staging|dev` (admin) to enforce profile policy via HTTP (`200` pass, `503` fail)
+- `GET /api/v1/jobs/alerts/gate/profile/matrix` (admin) to evaluate all profiles (`prod`, `staging`, `dev`) in one response
+- `GET /api/v1/jobs/alerts/gate/profile/matrix/check` (admin) to enforce profile matrix recommendation via HTTP (`200` pass, `503` fail)
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

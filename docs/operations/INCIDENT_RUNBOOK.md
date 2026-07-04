@@ -80,6 +80,8 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/gate/evaluate/check?mode=strict|relaxed|advice` when automation needs HTTP pass/fail for a selected evaluation mode.
 - Use `GET /api/v1/jobs/alerts/gate/profile?profile=prod|staging|dev` to apply environment presets consistently across release pipelines.
 - Use `GET /api/v1/jobs/alerts/gate/profile/check?profile=prod|staging|dev` when profile-based policy needs HTTP-native pass/fail gating.
+- Use `GET /api/v1/jobs/alerts/gate/profile/matrix` to compare all environment profiles side-by-side before promoting releases.
+- Use `GET /api/v1/jobs/alerts/gate/profile/matrix/check` for HTTP-native enforcement of the profile matrix recommendation.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.

@@ -68,6 +68,8 @@ from src.api.schemas import (
     JobAlertsGateAdviceResponse,
     JobAlertsGateEvaluateResponse,
     JobAlertsGateProfileResponse,
+    JobAlertsGateProfileResult,
+    JobAlertsGateProfileMatrixResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -1265,6 +1267,111 @@ def check_job_alerts_gate_profile(
         recommended_mode=str(evaluation["recommended_mode"]),
     )
     if payload.pass_gate:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/matrix", response_model=JobAlertsGateProfileMatrixResponse, tags=["Jobs"])
+def get_job_alerts_gate_profile_matrix(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    matrix = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_matrix_evaluation(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    profiles = cast(dict[str, dict[str, object]], matrix["profiles"])
+    profile_payload = {
+        name: JobAlertsGateProfileResult(
+            profile=str(item["profile"]),
+            profile_mode=str(item["profile_mode"]),
+            severity=str(item["severity"]),
+            breached=bool(item["breached"]),
+            mode=str(item["mode"]),
+            pass_gate=bool(item["pass_gate"]),
+            deployment_allowed=bool(item["deployment_allowed"]),
+            recommended_status_code=cast(int, item["recommended_status_code"]),
+            reasons=cast(list[str], item["reasons"]),
+            effective_fail_on_warning=cast(bool | None, item["effective_fail_on_warning"]),
+            recommended_mode=str(item["recommended_mode"]),
+        )
+        for name, item in profiles.items()
+    }
+    return JobAlertsGateProfileMatrixResponse(
+        status="success",
+        severity=str(matrix["severity"]),
+        breached=bool(matrix["breached"]),
+        recommended_profile=str(matrix["recommended_profile"]),
+        deployment_allowed=bool(matrix["deployment_allowed"]),
+        recommended_status_code=cast(int, matrix["recommended_status_code"]),
+        profiles=profile_payload,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/profile/matrix/check", response_model=JobAlertsGateProfileMatrixResponse, tags=["Jobs"])
+def check_job_alerts_gate_profile_matrix(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    matrix = cast(
+        dict[str, object],
+        jobs.get_alert_gate_profile_matrix_evaluation(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    profiles = cast(dict[str, dict[str, object]], matrix["profiles"])
+    profile_payload = {
+        name: JobAlertsGateProfileResult(
+            profile=str(item["profile"]),
+            profile_mode=str(item["profile_mode"]),
+            severity=str(item["severity"]),
+            breached=bool(item["breached"]),
+            mode=str(item["mode"]),
+            pass_gate=bool(item["pass_gate"]),
+            deployment_allowed=bool(item["deployment_allowed"]),
+            recommended_status_code=cast(int, item["recommended_status_code"]),
+            reasons=cast(list[str], item["reasons"]),
+            effective_fail_on_warning=cast(bool | None, item["effective_fail_on_warning"]),
+            recommended_mode=str(item["recommended_mode"]),
+        )
+        for name, item in profiles.items()
+    }
+    payload = JobAlertsGateProfileMatrixResponse(
+        status="success",
+        severity=str(matrix["severity"]),
+        breached=bool(matrix["breached"]),
+        recommended_profile=str(matrix["recommended_profile"]),
+        deployment_allowed=bool(matrix["deployment_allowed"]),
+        recommended_status_code=cast(int, matrix["recommended_status_code"]),
+        profiles=profile_payload,
+    )
+    if payload.deployment_allowed:
         return payload
 
     return JSONResponse(
