@@ -255,6 +255,16 @@ class JobDeadLetterTopTypesResponse(BaseModel):
     records: list[JobDeadLetterTopTypeRecord]
 
 
+class JobDeadLetterErrorRecord(BaseModel):
+    error_message: str
+    dead_letter: int
+
+
+class JobDeadLetterErrorsResponse(BaseModel):
+    status: str
+    records: list[JobDeadLetterErrorRecord]
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

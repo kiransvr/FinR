@@ -717,6 +717,44 @@ def test_get_dead_letter_top_types_returns_sorted_counts(tmp_path: Path) -> None
     assert int(rows[0]["dead_letter"]) >= 2
 
 
+def test_get_dead_letter_error_summary_returns_sorted_counts(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("err_job", lambda _: {"ok": True})
+
+    first = service.submit("err_job", payload={})
+    second = service.submit("err_job", payload={})
+    third = service.submit("err_job", payload={})
+
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', error='timeout'
+            WHERE job_id = ?
+            """,
+            (first.job_id,),
+        )
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', error='timeout'
+            WHERE job_id = ?
+            """,
+            (second.job_id,),
+        )
+        conn.execute(
+            """
+            UPDATE job_queue SET status='dead_letter', error='validation'
+            WHERE job_id = ?
+            """,
+            (third.job_id,),
+        )
+
+    rows = service.get_dead_letter_error_summary(limit=10)
+    assert len(rows) >= 2
+    assert str(rows[0]["error_message"]) == "timeout"
+    assert int(rows[0]["dead_letter"]) == 2
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

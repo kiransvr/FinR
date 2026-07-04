@@ -435,6 +435,29 @@ class JobService:
             for row in rows
         ]
 
+    def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
+        capped_limit = max(1, min(100, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT COALESCE(NULLIF(TRIM(error), ''), '(no error message)') AS error_message, COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter'
+                GROUP BY error_message
+                ORDER BY COUNT(*) DESC, error_message ASC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [
+            {
+                "error_message": str(row[0]),
+                "dead_letter": int(row[1]),
+            }
+            for row in rows
+        ]
+
     def get_drain_status(self) -> dict[str, object]:
         stats = self.get_job_stats()
         counts = cast(dict[str, int], stats["counts"])

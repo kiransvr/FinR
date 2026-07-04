@@ -60,6 +60,8 @@ from src.api.schemas import (
     JobAlertsHealthResponse,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
+    JobDeadLetterErrorRecord,
+    JobDeadLetterErrorsResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -619,6 +621,28 @@ def get_dead_letter_top_types(
         for row in rows
     ]
     return JobDeadLetterTopTypesResponse(status="success", records=records)
+
+
+@app.get("/api/v1/jobs/dead-letter-errors", response_model=JobDeadLetterErrorsResponse, tags=["Jobs"])
+def get_dead_letter_error_summary(
+    limit: int = Query(default=10, ge=1, le=100),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    rows = jobs.get_dead_letter_error_summary(limit=limit)
+    records = [
+        JobDeadLetterErrorRecord(
+            error_message=str(cast(dict[str, object], row)["error_message"]),
+            dead_letter=cast(int, cast(dict[str, object], row)["dead_letter"]),
+        )
+        for row in rows
+    ]
+    return JobDeadLetterErrorsResponse(status="success", records=records)
 
 
 @app.get("/api/v1/jobs/alerts", response_model=JobAlertsSnapshotResponse, tags=["Jobs"])
