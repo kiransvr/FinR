@@ -76,6 +76,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/stats-by-type` (admin) to inspect backlog concentration by job type
 - `GET /api/v1/jobs/worker-status` (admin) to verify worker liveness and current drain state
 - `POST /api/v1/jobs/restart-worker` (admin) to restart the queue worker and return updated worker status
+- `POST /api/v1/jobs/ensure-worker-alive` (admin) to start worker only if it is down and return current worker status
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

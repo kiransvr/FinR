@@ -52,6 +52,7 @@ from src.api.schemas import (
     JobTypeStatsRecord,
     JobWorkerStatusResponse,
     JobWorkerRestartResponse,
+    JobWorkerEnsureResponse,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -548,6 +549,29 @@ def restart_job_worker(
     return JobWorkerRestartResponse(
         status="success",
         restarted=bool(restarted),
+        worker_alive=bool(worker["worker_alive"]),
+        paused=bool(worker["paused"]),
+        running=cast(int, worker["running"]),
+        queued=cast(int, worker["queued"]),
+        drained=bool(worker["drained"]),
+    )
+
+
+@app.post("/api/v1/jobs/ensure-worker-alive", response_model=JobWorkerEnsureResponse, tags=["Jobs"])
+def ensure_job_worker_alive(
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    started = jobs.ensure_worker_alive()
+    worker = cast(dict[str, object], jobs.get_worker_status())
+    return JobWorkerEnsureResponse(
+        status="success",
+        started=bool(started),
         worker_alive=bool(worker["worker_alive"]),
         paused=bool(worker["paused"]),
         running=cast(int, worker["running"]),

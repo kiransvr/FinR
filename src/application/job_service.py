@@ -90,6 +90,12 @@ class JobService:
         self.start_worker()
         return not was_alive and self.is_worker_alive()
 
+    def ensure_worker_alive(self) -> bool:
+        if self.is_worker_alive():
+            return False
+        self.start_worker()
+        return self.is_worker_alive()
+
     def pause_processing(self) -> None:
         with self._lock:
             self._processing_paused = True

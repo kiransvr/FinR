@@ -189,6 +189,16 @@ class JobWorkerRestartResponse(BaseModel):
     drained: bool
 
 
+class JobWorkerEnsureResponse(BaseModel):
+    status: str
+    started: bool
+    worker_alive: bool
+    paused: bool
+    running: int
+    queued: int
+    drained: bool
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

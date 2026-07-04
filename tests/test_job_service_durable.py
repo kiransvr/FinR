@@ -374,6 +374,28 @@ def test_restart_worker_restores_processing_after_stop(tmp_path: Path) -> None:
     assert state.status == "succeeded"
 
 
+def test_ensure_worker_alive_starts_when_worker_is_down(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("ensure_job", lambda _: {"ok": True})
+
+    assert service.is_worker_alive() is False
+    started = service.ensure_worker_alive()
+    assert started is True
+    assert service.is_worker_alive() is True
+
+
+def test_ensure_worker_alive_noop_when_worker_already_alive(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("ensure_job", lambda _: {"ok": True})
+    service.start_worker()
+
+    started = service.ensure_worker_alive()
+    assert started is False
+    assert service.is_worker_alive() is True
+
+
 def test_get_worker_status_returns_expected_shape(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path)
