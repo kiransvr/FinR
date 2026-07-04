@@ -412,6 +412,29 @@ class JobService:
             "breached": breached,
         }
 
+    def get_dead_letter_top_types(self, limit: int = 10) -> list[dict[str, object]]:
+        capped_limit = max(1, min(100, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT job_type, COUNT(*)
+                FROM job_queue
+                WHERE status = 'dead_letter'
+                GROUP BY job_type
+                ORDER BY COUNT(*) DESC, job_type ASC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [
+            {
+                "job_type": str(row[0]),
+                "dead_letter": int(row[1]),
+            }
+            for row in rows
+        ]
+
     def get_drain_status(self) -> dict[str, object]:
         stats = self.get_job_stats()
         counts = cast(dict[str, int], stats["counts"])

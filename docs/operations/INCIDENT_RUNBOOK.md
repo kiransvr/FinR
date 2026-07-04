@@ -62,6 +62,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/queue-age?threshold_seconds=300` to detect starvation risk from aged queued jobs.
 - Use `GET /api/v1/jobs/queued-oldest?limit=20` to target the oldest queued work for cancel/requeue decisions.
 - Use `GET /api/v1/jobs/dead-letter-rate?window_seconds=3600&threshold_per_minute=1` to monitor failure acceleration and trigger rapid rollback/escalation.
+- Use `GET /api/v1/jobs/dead-letter-top-types?limit=10` to prioritize remediation on the highest-failing job types first.
 - Use `GET /api/v1/jobs/alerts` for a single severity snapshot combining worker liveness, queue-age breach, and dead-letter-rate breach.
 - Use `GET /api/v1/jobs/alerts/recommendations` to retrieve immediate action guidance mapped to current alert signals.
 - Use `GET /api/v1/jobs/alerts/health` in deployment/maintenance gates to enforce pass-fail criteria from current alert severity.

@@ -245,6 +245,16 @@ class JobAlertsHealthResponse(BaseModel):
     fail_on_warning: bool
 
 
+class JobDeadLetterTopTypeRecord(BaseModel):
+    job_type: str
+    dead_letter: int
+
+
+class JobDeadLetterTopTypesResponse(BaseModel):
+    status: str
+    records: list[JobDeadLetterTopTypeRecord]
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str
