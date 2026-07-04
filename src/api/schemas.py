@@ -245,6 +245,20 @@ class JobAlertsHealthResponse(BaseModel):
     fail_on_warning: bool
 
 
+class JobAlertSignalRecord(BaseModel):
+    name: str
+    status: str
+    breached: bool
+    details: dict
+
+
+class JobAlertsSignalsResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    signals: list[JobAlertSignalRecord]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

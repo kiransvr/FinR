@@ -58,6 +58,8 @@ from src.api.schemas import (
     JobAlertsSnapshotResponse,
     JobAlertsRecommendationsResponse,
     JobAlertsHealthResponse,
+    JobAlertsSignalsResponse,
+    JobAlertSignalRecord,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -708,31 +710,25 @@ def get_job_alerts_snapshot(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    worker = cast(dict[str, object], jobs.get_worker_status())
-    queue_age = cast(dict[str, object], jobs.get_queue_age_status(threshold_seconds=queue_age_threshold_seconds))
-    dead_letter_rate = cast(
+    signals_status = cast(
         dict[str, object],
-        jobs.get_dead_letter_rate_status(
-            window_seconds=dead_letter_window_seconds,
-            threshold_per_minute=dead_letter_threshold_per_minute,
+        jobs.get_alert_signals_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
         ),
     )
-
+    worker = cast(dict[str, object], signals_status["worker"])
+    queue_age = cast(dict[str, object], signals_status["queue_age"])
+    dead_letter_rate = cast(dict[str, object], signals_status["dead_letter_rate"])
     worker_alive = bool(worker["worker_alive"])
     queue_age_breached = bool(queue_age["breached"])
     dead_letter_rate_breached = bool(dead_letter_rate["breached"])
-    breached = (not worker_alive) or queue_age_breached or dead_letter_rate_breached
-
-    severity = "ok"
-    if (not worker_alive) or dead_letter_rate_breached:
-        severity = "critical"
-    elif queue_age_breached:
-        severity = "warning"
 
     return JobAlertsSnapshotResponse(
         status="success",
-        severity=severity,
-        breached=breached,
+        severity=str(signals_status["severity"]),
+        breached=bool(signals_status["breached"]),
         worker_alive=worker_alive,
         paused=bool(worker["paused"]),
         queued=cast(int, worker["queued"]),
@@ -741,6 +737,45 @@ def get_job_alerts_snapshot(
         dead_letter_rate_breached=dead_letter_rate_breached,
         oldest_queued_age_seconds=cast(float | None, queue_age["oldest_queued_age_seconds"]),
         dead_letter_rate_per_minute=float(cast(float, dead_letter_rate["rate_per_minute"])),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/signals", response_model=JobAlertsSignalsResponse, tags=["Jobs"])
+def get_job_alert_signals(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    status_payload = cast(
+        dict[str, object],
+        jobs.get_alert_signals_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    signal_rows = cast(list[dict[str, object]], status_payload["signals"])
+    records = [
+        JobAlertSignalRecord(
+            name=str(row["name"]),
+            status=str(row["status"]),
+            breached=bool(row["breached"]),
+            details=cast(dict, row["details"]),
+        )
+        for row in signal_rows
+    ]
+    return JobAlertsSignalsResponse(
+        status="success",
+        severity=str(status_payload["severity"]),
+        breached=bool(status_payload["breached"]),
+        signals=records,
     )
 
 
@@ -757,25 +792,20 @@ def get_job_alert_recommendations(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    worker = cast(dict[str, object], jobs.get_worker_status())
-    queue_age = cast(dict[str, object], jobs.get_queue_age_status(threshold_seconds=queue_age_threshold_seconds))
-    dead_letter_rate = cast(
+    signals_status = cast(
         dict[str, object],
-        jobs.get_dead_letter_rate_status(
-            window_seconds=dead_letter_window_seconds,
-            threshold_per_minute=dead_letter_threshold_per_minute,
+        jobs.get_alert_signals_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
         ),
     )
-
+    worker = cast(dict[str, object], signals_status["worker"])
+    queue_age = cast(dict[str, object], signals_status["queue_age"])
+    dead_letter_rate = cast(dict[str, object], signals_status["dead_letter_rate"])
     worker_alive = bool(worker["worker_alive"])
     queue_age_breached = bool(queue_age["breached"])
     dead_letter_rate_breached = bool(dead_letter_rate["breached"])
-
-    severity = "ok"
-    if (not worker_alive) or dead_letter_rate_breached:
-        severity = "critical"
-    elif queue_age_breached:
-        severity = "warning"
 
     recommendations: list[str] = []
     if not worker_alive:
@@ -789,7 +819,7 @@ def get_job_alert_recommendations(
 
     return JobAlertsRecommendationsResponse(
         status="success",
-        severity=severity,
+        severity=str(signals_status["severity"]),
         recommendations=recommendations,
     )
 
@@ -808,25 +838,15 @@ def get_job_alerts_health(
     except AuthorizationError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
 
-    worker = cast(dict[str, object], jobs.get_worker_status())
-    queue_age = cast(dict[str, object], jobs.get_queue_age_status(threshold_seconds=queue_age_threshold_seconds))
-    dead_letter_rate = cast(
+    signals_status = cast(
         dict[str, object],
-        jobs.get_dead_letter_rate_status(
-            window_seconds=dead_letter_window_seconds,
-            threshold_per_minute=dead_letter_threshold_per_minute,
+        jobs.get_alert_signals_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
         ),
     )
-
-    worker_alive = bool(worker["worker_alive"])
-    queue_age_breached = bool(queue_age["breached"])
-    dead_letter_rate_breached = bool(dead_letter_rate["breached"])
-
-    severity = "ok"
-    if (not worker_alive) or dead_letter_rate_breached:
-        severity = "critical"
-    elif queue_age_breached:
-        severity = "warning"
+    severity = str(signals_status["severity"])
 
     healthy = severity == "ok"
     if fail_on_warning:

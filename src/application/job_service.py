@@ -495,6 +495,78 @@ class JobService:
             "direction": direction,
         }
 
+    def get_alert_signals_status(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        worker = cast(dict[str, object], self.get_worker_status())
+        queue_age = cast(dict[str, object], self.get_queue_age_status(threshold_seconds=queue_age_threshold_seconds))
+        dead_letter_rate = cast(
+            dict[str, object],
+            self.get_dead_letter_rate_status(
+            window_seconds=dead_letter_window_seconds,
+            threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        worker_alive = bool(worker["worker_alive"])
+        queue_age_breached = bool(queue_age["breached"])
+        dead_letter_rate_breached = bool(dead_letter_rate["breached"])
+
+        severity = "ok"
+        if (not worker_alive) or dead_letter_rate_breached:
+            severity = "critical"
+        elif queue_age_breached:
+            severity = "warning"
+
+        signals = [
+            {
+                "name": "worker",
+                "status": "ok" if worker_alive else "critical",
+                "breached": not worker_alive,
+                "details": {
+                    "worker_alive": worker_alive,
+                    "paused": bool(worker["paused"]),
+                    "queued": cast(int, worker["queued"]),
+                    "running": cast(int, worker["running"]),
+                },
+            },
+            {
+                "name": "queue_age",
+                "status": "warning" if queue_age_breached else "ok",
+                "breached": queue_age_breached,
+                "details": {
+                    "queued": cast(int, queue_age["queued"]),
+                    "oldest_queued_at": cast(str | None, queue_age["oldest_queued_at"]),
+                    "oldest_queued_age_seconds": cast(float | None, queue_age["oldest_queued_age_seconds"]),
+                    "threshold_seconds": cast(float, queue_age["threshold_seconds"]),
+                },
+            },
+            {
+                "name": "dead_letter_rate",
+                "status": "critical" if dead_letter_rate_breached else "ok",
+                "breached": dead_letter_rate_breached,
+                "details": {
+                    "window_seconds": cast(float, dead_letter_rate["window_seconds"]),
+                    "threshold_per_minute": cast(float, dead_letter_rate["threshold_per_minute"]),
+                    "recent_dead_letter": cast(int, dead_letter_rate["recent_dead_letter"]),
+                    "total_dead_letter": cast(int, dead_letter_rate["total_dead_letter"]),
+                    "rate_per_minute": cast(float, dead_letter_rate["rate_per_minute"]),
+                },
+            },
+        ]
+
+        return {
+            "severity": severity,
+            "breached": severity != "ok",
+            "worker": worker,
+            "queue_age": queue_age,
+            "dead_letter_rate": dead_letter_rate,
+            "signals": signals,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

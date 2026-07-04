@@ -85,6 +85,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/dead-letter-recent` (admin) to inspect the latest dead-letter incidents and error details
 - `GET /api/v1/jobs/dead-letter-trend` (admin) to compare recent dead-letter volume against the previous window
 - `GET /api/v1/jobs/alerts` (admin) to get consolidated queue/worker alert severity in a single response
+- `GET /api/v1/jobs/alerts/signals` (admin) to inspect worker/queue/dead-letter signals with per-signal status and details
 - `GET /api/v1/jobs/alerts/recommendations` (admin) to get action-oriented operational guidance from alert signals
 - `GET /api/v1/jobs/alerts/health` (admin) to expose machine-friendly health (`ok/warning/critical`) for automation gates
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
