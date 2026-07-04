@@ -63,6 +63,8 @@ from src.api.schemas import (
     JobAlertsFailingSignalsResponse,
     JobFailingAlertSignalRecord,
     JobAlertsGateResponse,
+    JobAlertsGateMatrixResponse,
+    JobAlertsGateModeResult,
     JobDeadLetterTopTypeRecord,
     JobDeadLetterTopTypesResponse,
     JobDeadLetterErrorRecord,
@@ -979,6 +981,51 @@ def check_job_alerts_gate(
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/matrix", response_model=JobAlertsGateMatrixResponse, tags=["Jobs"])
+def get_job_alerts_gate_matrix(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    matrix = cast(
+        dict[str, object],
+        jobs.get_alert_gate_matrix_status(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    relaxed = cast(dict[str, object], matrix["relaxed"])
+    strict = cast(dict[str, object], matrix["strict"])
+
+    return JobAlertsGateMatrixResponse(
+        status="success",
+        severity=str(matrix["severity"]),
+        breached=bool(matrix["breached"]),
+        relaxed=JobAlertsGateModeResult(
+            fail_on_warning=bool(relaxed["fail_on_warning"]),
+            pass_gate=bool(relaxed["pass_gate"]),
+            failing_count=cast(int, relaxed["failing_count"]),
+            reasons=cast(list[str], relaxed["reasons"]),
+            recommended_status_code=cast(int, relaxed["recommended_status_code"]),
+        ),
+        strict=JobAlertsGateModeResult(
+            fail_on_warning=bool(strict["fail_on_warning"]),
+            pass_gate=bool(strict["pass_gate"]),
+            failing_count=cast(int, strict["failing_count"]),
+            reasons=cast(list[str], strict["reasons"]),
+            recommended_status_code=cast(int, strict["recommended_status_code"]),
+        ),
     )
 
 

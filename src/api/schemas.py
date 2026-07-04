@@ -286,6 +286,22 @@ class JobAlertsGateResponse(BaseModel):
     reasons: list[str]
 
 
+class JobAlertsGateModeResult(BaseModel):
+    fail_on_warning: bool
+    pass_gate: bool
+    failing_count: int
+    reasons: list[str]
+    recommended_status_code: int
+
+
+class JobAlertsGateMatrixResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    relaxed: JobAlertsGateModeResult
+    strict: JobAlertsGateModeResult
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

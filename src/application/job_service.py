@@ -653,6 +653,53 @@ class JobService:
             "reasons": reasons,
         }
 
+    def get_alert_gate_matrix_status(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        relaxed = cast(
+            dict[str, object],
+            self.get_alert_gate_status(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+                fail_on_warning=False,
+            ),
+        )
+        strict = cast(
+            dict[str, object],
+            self.get_alert_gate_status(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+                fail_on_warning=True,
+            ),
+        )
+
+        relaxed_pass = bool(relaxed["pass_gate"])
+        strict_pass = bool(strict["pass_gate"])
+
+        return {
+            "severity": str(relaxed["severity"]),
+            "breached": bool(relaxed["breached"]),
+            "relaxed": {
+                "fail_on_warning": False,
+                "pass_gate": relaxed_pass,
+                "failing_count": cast(int, relaxed["failing_count"]),
+                "reasons": cast(list[str], relaxed["reasons"]),
+                "recommended_status_code": 200 if relaxed_pass else 503,
+            },
+            "strict": {
+                "fail_on_warning": True,
+                "pass_gate": strict_pass,
+                "failing_count": cast(int, strict["failing_count"]),
+                "reasons": cast(list[str], strict["reasons"]),
+                "recommended_status_code": 200 if strict_pass else 503,
+            },
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

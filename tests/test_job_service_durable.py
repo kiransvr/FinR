@@ -1025,6 +1025,67 @@ def test_get_alert_gate_status_critical_fails_even_in_relaxed_mode(tmp_path: Pat
     assert int(gate["failing_count"]) >= 1
 
 
+def test_get_alert_gate_matrix_status_reports_relaxed_and_strict_modes(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        matrix = service.get_alert_gate_matrix_status(
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        assert str(matrix["severity"]) == "warning"
+        assert bool(matrix["breached"]) is True
+
+        relaxed = matrix["relaxed"]
+        strict = matrix["strict"]
+        assert bool(relaxed["pass_gate"]) is True
+        assert bool(strict["pass_gate"]) is False
+        assert int(relaxed["recommended_status_code"]) == 200
+        assert int(strict["recommended_status_code"]) == 503
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_matrix_status_critical_fails_both_modes(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    matrix = service.get_alert_gate_matrix_status(
+        queue_age_threshold_seconds=300,
+        dead_letter_window_seconds=60,
+        dead_letter_threshold_per_minute=1000,
+    )
+    assert str(matrix["severity"]) == "critical"
+    relaxed = matrix["relaxed"]
+    strict = matrix["strict"]
+    assert bool(relaxed["pass_gate"]) is False
+    assert bool(strict["pass_gate"]) is False
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)
