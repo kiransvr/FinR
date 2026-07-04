@@ -700,6 +700,53 @@ class JobService:
             },
         }
 
+    def get_alert_gate_policy_advice(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        matrix = cast(
+            dict[str, object],
+            self.get_alert_gate_matrix_status(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        relaxed = cast(dict[str, object], matrix["relaxed"])
+        strict = cast(dict[str, object], matrix["strict"])
+
+        strict_pass = bool(strict["pass_gate"])
+        relaxed_pass = bool(relaxed["pass_gate"])
+
+        recommended_mode = "block"
+        recommended_status_code = 503
+        deployment_allowed = False
+        reasons = cast(list[str], strict["reasons"])
+
+        if strict_pass:
+            recommended_mode = "strict"
+            recommended_status_code = 200
+            deployment_allowed = True
+            reasons = cast(list[str], strict["reasons"])
+        elif relaxed_pass:
+            recommended_mode = "relaxed"
+            recommended_status_code = 200
+            deployment_allowed = True
+            reasons = cast(list[str], relaxed["reasons"])
+
+        return {
+            "severity": str(matrix["severity"]),
+            "breached": bool(matrix["breached"]),
+            "strict_pass": strict_pass,
+            "relaxed_pass": relaxed_pass,
+            "recommended_mode": recommended_mode,
+            "deployment_allowed": deployment_allowed,
+            "recommended_status_code": recommended_status_code,
+            "reasons": reasons,
+        }
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:

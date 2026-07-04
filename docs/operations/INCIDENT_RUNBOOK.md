@@ -74,6 +74,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/gate` for automation-friendly pass/fail with reasons; set `fail_on_warning=true` for stricter release gating.
 - Use `GET /api/v1/jobs/alerts/gate/check` when your pipeline needs HTTP-native gating (`200` pass, `503` fail).
 - Use `GET /api/v1/jobs/alerts/gate/matrix` to compare relaxed and strict gate policy outcomes before changing release thresholds.
+- Use `GET /api/v1/jobs/alerts/gate/advice` to retrieve the recommended policy mode (`strict`, `relaxed`, or `block`) for current conditions.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.

@@ -92,6 +92,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate` (admin) to return deployment gate pass/fail with explicit failure reasons (`?fail_on_warning=true` for strict mode)
 - `GET /api/v1/jobs/alerts/gate/check` (admin) to return HTTP `200` on gate pass or `503` on gate fail for direct CI/CD enforcement
 - `GET /api/v1/jobs/alerts/gate/matrix` (admin) to compare relaxed vs strict gate outcomes in one response for policy tuning
+- `GET /api/v1/jobs/alerts/gate/advice` (admin) to get a recommended gate policy (`strict`, `relaxed`, or `block`) from current alert signals
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

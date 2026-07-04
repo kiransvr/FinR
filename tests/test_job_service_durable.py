@@ -1086,6 +1086,65 @@ def test_get_alert_gate_matrix_status_critical_fails_both_modes(tmp_path: Path) 
     assert bool(strict["pass_gate"]) is False
 
 
+def test_get_alert_gate_policy_advice_prefers_relaxed_on_warning(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        advice = service.get_alert_gate_policy_advice(
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        assert str(advice["severity"]) == "warning"
+        assert bool(advice["relaxed_pass"]) is True
+        assert bool(advice["strict_pass"]) is False
+        assert str(advice["recommended_mode"]) == "relaxed"
+        assert bool(advice["deployment_allowed"]) is True
+        assert int(advice["recommended_status_code"]) == 200
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_gate_policy_advice_blocks_on_critical(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    advice = service.get_alert_gate_policy_advice(
+        queue_age_threshold_seconds=300,
+        dead_letter_window_seconds=60,
+        dead_letter_threshold_per_minute=1000,
+    )
+    assert str(advice["severity"]) == "critical"
+    assert bool(advice["relaxed_pass"]) is False
+    assert bool(advice["strict_pass"]) is False
+    assert str(advice["recommended_mode"]) == "block"
+    assert bool(advice["deployment_allowed"]) is False
+    assert int(advice["recommended_status_code"]) == 503
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

@@ -302,6 +302,18 @@ class JobAlertsGateMatrixResponse(BaseModel):
     strict: JobAlertsGateModeResult
 
 
+class JobAlertsGateAdviceResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    strict_pass: bool
+    relaxed_pass: bool
+    recommended_mode: str
+    deployment_allowed: bool
+    recommended_status_code: int
+    reasons: list[str]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int
