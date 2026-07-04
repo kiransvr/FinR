@@ -275,6 +275,36 @@ class JobService:
             },
         }
 
+    def get_job_type_stats(self, limit: int = 50) -> list[dict[str, object]]:
+        capped_limit = max(1, min(200, int(limit)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    job_type,
+                    SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) AS queued_count,
+                    SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running_count,
+                    SUM(CASE WHEN status = 'dead_letter' THEN 1 ELSE 0 END) AS dead_letter_count,
+                    COUNT(*) AS total_count
+                FROM job_queue
+                GROUP BY job_type
+                ORDER BY total_count DESC, job_type ASC
+                LIMIT ?
+                """,
+                (capped_limit,),
+            ).fetchall()
+
+        return [
+            {
+                "job_type": str(row[0]),
+                "queued": int(row[1]),
+                "running": int(row[2]),
+                "dead_letter": int(row[3]),
+                "total": int(row[4]),
+            }
+            for row in rows
+        ]
+
     def get_drain_status(self) -> dict[str, object]:
         stats = self.get_job_stats()
         counts = cast(dict[str, int], stats["counts"])

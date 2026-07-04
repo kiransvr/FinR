@@ -120,6 +120,15 @@ def _login(username: str, password: str) -> str:
         "/api/v1/auth/login",
         json={"username": username, "password": password},
     )
+    if response.status_code == 429:
+        from src.api.main import _login_rate_limiter
+
+        with _login_rate_limiter._lock:
+            _login_rate_limiter._events.clear()
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": username, "password": password},
+        )
     assert response.status_code == 200
     return response.json()["access_token"]
 
@@ -343,6 +352,34 @@ def test_job_stats_endpoint_returns_counts() -> None:
     payload = response.json()
     assert payload["status"] == "success"
     assert isinstance(payload["counts"]["total"], int)
+
+
+def test_job_type_stats_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/stats-by-type",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_type_stats_endpoint_returns_records() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/stats-by-type?limit=10",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["records"], list)
+    if payload["records"]:
+        first = payload["records"][0]
+        assert isinstance(first["job_type"], str)
+        assert isinstance(first["queued"], int)
+        assert isinstance(first["running"], int)
+        assert isinstance(first["dead_letter"], int)
+        assert isinstance(first["total"], int)
 
 
 def test_pipeline_async_submission_is_deduplicated_by_default() -> None:

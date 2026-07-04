@@ -157,6 +157,19 @@ class JobStatsResponse(BaseModel):
     oldest: JobStatsOldest
 
 
+class JobTypeStatsRecord(BaseModel):
+    job_type: str
+    queued: int
+    running: int
+    dead_letter: int
+    total: int
+
+
+class JobTypeStatsResponse(BaseModel):
+    status: str
+    records: list[JobTypeStatsRecord]
+
+
 class JobCleanupResponse(BaseModel):
     status: str
     message: str

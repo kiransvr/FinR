@@ -488,6 +488,34 @@ def test_wait_for_drain_times_out_when_not_drained(tmp_path: Path) -> None:
     assert status["timed_out"] is True
 
 
+def test_get_job_type_stats_returns_aggregated_counts(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("type_a", lambda _: {"ok": True})
+    service.register_handler("type_b", lambda _: {"ok": True})
+
+    a = service.submit("type_a", payload={})
+    b = service.submit("type_b", payload={})
+    canceled = service.cancel_queued_job(b.job_id)
+
+    assert canceled is not None
+    assert canceled.status == "canceled"
+
+    stats = service.get_job_type_stats(limit=10)
+    assert len(stats) >= 2
+    by_type = {str(row["job_type"]): row for row in stats}
+
+    assert "type_a" in by_type
+    assert int(by_type["type_a"]["total"]) >= 1
+    assert int(by_type["type_a"]["queued"]) >= 1
+
+    assert "type_b" in by_type
+    assert int(by_type["type_b"]["total"]) >= 1
+    assert int(by_type["type_b"]["queued"]) == 0
+
+    _ = a
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

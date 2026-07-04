@@ -48,6 +48,8 @@ from src.api.schemas import (
     JobStatsResponse,
     JobStatsCounts,
     JobStatsOldest,
+    JobTypeStatsResponse,
+    JobTypeStatsRecord,
     JobCleanupResponse,
     JobActionCountResponse,
     JobDrainStatusResponse,
@@ -481,6 +483,31 @@ def get_job_stats(
             dead_letter=oldest["dead_letter"],
         ),
     )
+
+
+@app.get("/api/v1/jobs/stats-by-type", response_model=JobTypeStatsResponse, tags=["Jobs"])
+def get_job_type_stats(
+    limit: int = Query(default=50, ge=1, le=200),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    rows = jobs.get_job_type_stats(limit=limit)
+    records = [
+        JobTypeStatsRecord(
+            job_type=str(cast(dict[str, object], row)["job_type"]),
+            queued=cast(int, cast(dict[str, object], row)["queued"]),
+            running=cast(int, cast(dict[str, object], row)["running"]),
+            dead_letter=cast(int, cast(dict[str, object], row)["dead_letter"]),
+            total=cast(int, cast(dict[str, object], row)["total"]),
+        )
+        for row in rows
+    ]
+    return JobTypeStatsResponse(status="success", records=records)
 
 
 @app.get("/api/v1/jobs/drain-status", response_model=JobDrainStatusResponse, tags=["Jobs"])
