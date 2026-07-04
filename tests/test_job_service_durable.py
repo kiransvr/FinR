@@ -348,6 +348,32 @@ def test_is_worker_alive_reflects_start_and_stop(tmp_path: Path) -> None:
     assert service.is_worker_alive() is False
 
 
+def test_restart_worker_restores_processing_after_stop(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path, poll_interval_seconds=0.01)
+    service.register_handler("restart_job", lambda _: {"ok": True})
+
+    service.start_worker()
+    service.stop_worker()
+    assert service.is_worker_alive() is False
+
+    restarted = service.restart_worker()
+    assert restarted is True
+    assert service.is_worker_alive() is True
+
+    submitted = service.submit("restart_job", payload={})
+    for _ in range(200):
+        state = service.get(submitted.job_id)
+        assert state is not None
+        if state.status == "succeeded":
+            break
+        time.sleep(0.01)
+
+    state = service.get(submitted.job_id)
+    assert state is not None
+    assert state.status == "succeeded"
+
+
 def test_get_worker_status_returns_expected_shape(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path)

@@ -57,6 +57,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/stats` to quickly assess backlog size and concentration of `dead_letter` failures.
 - Use `GET /api/v1/jobs/stats-by-type` to identify which job types are driving queue pressure before requeue/cancel actions.
 - Use `GET /api/v1/jobs/worker-status` to confirm the background worker is alive and whether paused workloads are fully drained.
+- If worker liveness is false, run `POST /api/v1/jobs/restart-worker` and re-check `worker-status` before retrying queued operations.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.

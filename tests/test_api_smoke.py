@@ -407,6 +407,32 @@ def test_job_worker_status_endpoint_returns_shape() -> None:
     assert isinstance(payload["drained"], bool)
 
 
+def test_job_restart_worker_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.post(
+        "/api/v1/jobs/restart-worker",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_restart_worker_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.post(
+        "/api/v1/jobs/restart-worker",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["restarted"], bool)
+    assert isinstance(payload["worker_alive"], bool)
+    assert isinstance(payload["paused"], bool)
+    assert isinstance(payload["running"], int)
+    assert isinstance(payload["queued"], int)
+    assert isinstance(payload["drained"], bool)
+
+
 def test_pipeline_async_submission_is_deduplicated_by_default() -> None:
     admin_token = _login("admin", "changeme")
     first = client.post(

@@ -56,6 +56,7 @@ class JobService:
         self._max_queued_jobs = max(1, max_queued_jobs)
         self._handlers: dict[str, Callable[[dict], dict]] = {}
         self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
+        self._runner_executor_shutdown = False
         self._lock = Lock()
         self._stop_event = Event()
         self._processing_paused = False
@@ -69,6 +70,9 @@ class JobService:
         self._stop_event.clear()
         if self._worker and self._worker.is_alive():
             return
+        if self._runner_executor_shutdown:
+            self._runner_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="risk-job-runner")
+            self._runner_executor_shutdown = False
         self._worker = Thread(target=self._worker_loop, name="risk-job-worker", daemon=True)
         self._worker.start()
 
@@ -78,6 +82,13 @@ class JobService:
             self._worker.join(timeout=max(0.1, join_timeout_seconds))
         self._worker = None
         self._runner_executor.shutdown(wait=False, cancel_futures=True)
+        self._runner_executor_shutdown = True
+
+    def restart_worker(self) -> bool:
+        was_alive = self.is_worker_alive()
+        self.stop_worker()
+        self.start_worker()
+        return not was_alive and self.is_worker_alive()
 
     def pause_processing(self) -> None:
         with self._lock:
