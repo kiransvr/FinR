@@ -79,6 +79,8 @@ from src.api.schemas import (
     JobAlertIncidentAnnotationRecord,
     JobAlertIncidentAnnotationResponse,
     JobAlertIncidentAnnotationListResponse,
+    JobAlertGateDecisionRecord,
+    JobAlertGateDecisionListResponse,
     JobAlertIncidentAnnotationRequest,
     JobAlertIncidentAnnotationRecord,
     JobAlertIncidentAnnotationResponse,
@@ -123,6 +125,24 @@ def get_risk_service() -> RiskService:
 
 def get_job_service() -> JobService:
     return _job_service
+
+
+def _record_gate_decision(
+    jobs: JobService,
+    current_user: TokenData,
+    decision_type: str,
+    allowed: bool,
+    status_code: int,
+    payload: dict[str, object],
+) -> None:
+    jobs.add_alert_gate_decision(
+        decision_type=decision_type,
+        allowed=allowed,
+        status_code=status_code,
+        payload=payload,
+        created_by=current_user.username,
+        created_by_role=current_user.role,
+    )
 
 
 def _raise_not_found(exc: NotFoundError) -> None:
@@ -993,7 +1013,16 @@ def check_job_alerts_gate(
         failing_count=cast(int, gate["failing_count"]),
         reasons=cast(list[str], gate["reasons"]),
     )
-    if payload.pass_gate:
+    allowed = payload.pass_gate
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1113,7 +1142,16 @@ def check_job_alerts_gate_advice(
         recommended_status_code=cast(int, advice["recommended_status_code"]),
         reasons=cast(list[str], advice["reasons"]),
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_advice",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1194,7 +1232,16 @@ def check_job_alerts_gate_evaluate(
         effective_fail_on_warning=cast(bool | None, evaluation["effective_fail_on_warning"]),
         recommended_mode=str(evaluation["recommended_mode"]),
     )
-    if payload.pass_gate:
+    allowed = payload.pass_gate
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_evaluate",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1279,7 +1326,16 @@ def check_job_alerts_gate_profile(
         effective_fail_on_warning=cast(bool | None, evaluation["effective_fail_on_warning"]),
         recommended_mode=str(evaluation["recommended_mode"]),
     )
-    if payload.pass_gate:
+    allowed = payload.pass_gate
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1384,7 +1440,16 @@ def check_job_alerts_gate_profile_matrix(
         recommended_status_code=cast(int, matrix["recommended_status_code"]),
         profiles=profile_payload,
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile_matrix",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1495,7 +1560,16 @@ def check_job_alerts_gate_profile_rollout(
         reasons=cast(list[str], rollout["reasons"]),
         profiles=profile_payload,
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile_rollout",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1594,7 +1668,16 @@ def check_job_alerts_gate_profile_rollout_plan(
             for item in stages
         ],
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile_rollout_plan",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1695,7 +1778,16 @@ def check_job_alerts_gate_profile_rollout_summary(
         suppression_reason=cast(str | None, summary["suppression_reason"]),
         suppressed=bool(summary["suppressed"]),
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile_rollout_summary",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1776,7 +1868,16 @@ def check_job_alerts_gate_profile_rollout_policy(
         blocking_profiles=cast(list[str], policy_payload["blocking_profiles"]),
         reasons=cast(list[str], policy_payload["reasons"]),
     )
-    if payload.deployment_allowed:
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_gate_profile_rollout_policy",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
         return payload
 
     return JSONResponse(
@@ -1849,6 +1950,42 @@ def list_job_alert_incidents(
         for item in records
     ]
     return JobAlertIncidentAnnotationListResponse(
+        status="success",
+        total=len(payload),
+        records=payload,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/gate/decisions", response_model=JobAlertGateDecisionListResponse, tags=["Jobs"])
+def list_job_alert_gate_decisions(
+    limit: int = Query(default=50, ge=1, le=500),
+    decision_type: str | None = Query(default=None),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    records = cast(
+        list[dict[str, object]],
+        jobs.list_alert_gate_decisions(limit=limit, decision_type=decision_type),
+    )
+    payload = [
+        JobAlertGateDecisionRecord(
+            decision_id=str(item["decision_id"]),
+            decision_type=str(item["decision_type"]),
+            allowed=bool(item["allowed"]),
+            status_code=cast(int, item["status_code"]),
+            payload=cast(dict[str, object], item["payload"]),
+            created_by=str(item["created_by"]),
+            created_by_role=str(item["created_by_role"]),
+            created_at=str(item["created_at"]),
+        )
+        for item in records
+    ]
+    return JobAlertGateDecisionListResponse(
         status="success",
         total=len(payload),
         records=payload,

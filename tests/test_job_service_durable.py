@@ -1624,6 +1624,55 @@ def test_list_alert_incident_annotations_supports_scope_filter(tmp_path: Path) -
     assert all(str(item["scope"]) == "rollout" for item in rollout_rows)
 
 
+def test_add_alert_gate_decision_and_list_round_trip(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+
+    created = service.add_alert_gate_decision(
+        decision_type="alerts_gate",
+        allowed=True,
+        status_code=200,
+        payload={"status": "success", "pass_gate": True},
+        created_by="admin",
+        created_by_role="admin",
+    )
+    assert str(created["decision_type"]) == "alerts_gate"
+    assert bool(created["allowed"]) is True
+
+    rows = service.list_alert_gate_decisions(limit=10)
+    assert len(rows) >= 1
+    latest = rows[0]
+    assert str(latest["decision_id"]) == str(created["decision_id"])
+    assert int(latest["status_code"]) == 200
+    assert isinstance(latest["payload"], dict)
+
+
+def test_list_alert_gate_decisions_supports_decision_type_filter(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+
+    service.add_alert_gate_decision(
+        decision_type="alerts_gate",
+        allowed=True,
+        status_code=200,
+        payload={"status": "success"},
+        created_by="admin",
+        created_by_role="admin",
+    )
+    service.add_alert_gate_decision(
+        decision_type="alerts_gate_profile",
+        allowed=False,
+        status_code=503,
+        payload={"status": "success"},
+        created_by="admin",
+        created_by_role="admin",
+    )
+
+    rows = service.list_alert_gate_decisions(limit=10, decision_type="alerts_gate")
+    assert len(rows) >= 1
+    assert all(str(item["decision_type"]) == "alerts_gate" for item in rows)
+
+
 def test_requeue_dead_letter_jobs_bulk_requeues_recoverable_jobs(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path, max_attempts=1, retry_backoff_seconds=0.01, poll_interval_seconds=0.01)

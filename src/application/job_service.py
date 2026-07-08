@@ -1209,6 +1209,102 @@ class JobService:
             for row in rows
         ]
 
+    def add_alert_gate_decision(
+        self,
+        decision_type: str,
+        allowed: bool,
+        status_code: int,
+        payload: dict[str, object],
+        created_by: str,
+        created_by_role: str,
+    ) -> dict[str, object]:
+        normalized_decision_type = decision_type.strip().lower()
+        if not normalized_decision_type:
+            raise ValueError("decision_type cannot be empty")
+
+        decision_id = str(uuid4())
+        created_at = self._utc_now()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO job_alert_gate_decisions(
+                    decision_id,
+                    decision_type,
+                    allowed,
+                    status_code,
+                    payload_json,
+                    created_by,
+                    created_by_role,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    decision_id,
+                    normalized_decision_type,
+                    1 if allowed else 0,
+                    int(status_code),
+                    json.dumps(payload),
+                    created_by,
+                    created_by_role,
+                    created_at,
+                ),
+            )
+
+        return {
+            "decision_id": decision_id,
+            "decision_type": normalized_decision_type,
+            "allowed": bool(allowed),
+            "status_code": int(status_code),
+            "payload": payload,
+            "created_by": created_by,
+            "created_by_role": created_by_role,
+            "created_at": created_at,
+        }
+
+    def list_alert_gate_decisions(
+        self,
+        limit: int = 50,
+        decision_type: str | None = None,
+    ) -> list[dict[str, object]]:
+        capped_limit = max(1, min(500, int(limit)))
+        with self._connect() as conn:
+            if decision_type:
+                rows = conn.execute(
+                    """
+                    SELECT decision_id, decision_type, allowed, status_code, payload_json, created_by, created_by_role, created_at
+                    FROM job_alert_gate_decisions
+                    WHERE decision_type = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (decision_type.strip().lower(), capped_limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT decision_id, decision_type, allowed, status_code, payload_json, created_by, created_by_role, created_at
+                    FROM job_alert_gate_decisions
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (capped_limit,),
+                ).fetchall()
+
+        return [
+            {
+                "decision_id": str(row[0]),
+                "decision_type": str(row[1]),
+                "allowed": bool(int(row[2])),
+                "status_code": int(row[3]),
+                "payload": cast(dict[str, object], json.loads(row[4] or "{}")),
+                "created_by": str(row[5]),
+                "created_by_role": str(row[6]),
+                "created_at": str(row[7]),
+            }
+            for row in rows
+        ]
+
     def get_dead_letter_error_summary(self, limit: int = 10) -> list[dict[str, object]]:
         capped_limit = max(1, min(100, int(limit)))
         with self._connect() as conn:
@@ -1662,6 +1758,20 @@ class JobService:
                     scope TEXT NOT NULL,
                     summary TEXT NOT NULL,
                     details_json TEXT,
+                    created_by TEXT NOT NULL,
+                    created_by_role TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS job_alert_gate_decisions (
+                    decision_id TEXT PRIMARY KEY,
+                    decision_type TEXT NOT NULL,
+                    allowed INTEGER NOT NULL,
+                    status_code INTEGER NOT NULL,
+                    payload_json TEXT,
                     created_by TEXT NOT NULL,
                     created_by_role TEXT NOT NULL,
                     created_at TEXT NOT NULL

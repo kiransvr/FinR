@@ -2044,6 +2044,56 @@ def test_job_alerts_incidents_list_endpoint_returns_records_and_supports_scope()
     assert all(record["scope"] == "rollout" for record in payload["records"])
 
 
+def test_job_alerts_gate_decisions_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/decisions?limit=10",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_gate_decisions_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/gate/decisions?limit=10",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["total"], int)
+    assert isinstance(payload["records"], list)
+    if payload["records"]:
+        first = payload["records"][0]
+        assert isinstance(first["decision_id"], str)
+        assert isinstance(first["decision_type"], str)
+        assert isinstance(first["allowed"], bool)
+        assert first["status_code"] in {200, 503}
+        assert isinstance(first["payload"], dict)
+
+
+def test_job_alerts_gate_decisions_endpoint_captures_check_calls() -> None:
+    admin_token = _login("admin", "changeme")
+
+    decision_response = client.get(
+        "/api/v1/jobs/alerts/gate/check?fail_on_warning=false",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert decision_response.status_code in {200, 503}
+
+    history_response = client.get(
+        "/api/v1/jobs/alerts/gate/decisions?limit=50&decision_type=alerts_gate",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert history_response.status_code == 200
+    payload = history_response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["records"], list)
+    assert payload["records"]
+    assert all(record["decision_type"] == "alerts_gate" for record in payload["records"])
+
+
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.post(

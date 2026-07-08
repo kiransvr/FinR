@@ -470,6 +470,23 @@ class JobAlertIncidentAnnotationListResponse(BaseModel):
     records: list[JobAlertIncidentAnnotationRecord]
 
 
+class JobAlertGateDecisionRecord(BaseModel):
+    decision_id: str
+    decision_type: str
+    allowed: bool
+    status_code: int
+    payload: dict[str, object]
+    created_by: str
+    created_by_role: str
+    created_at: str
+
+
+class JobAlertGateDecisionListResponse(BaseModel):
+    status: str
+    total: int
+    records: list[JobAlertGateDecisionRecord]
+
+
 class JobDeadLetterTopTypeRecord(BaseModel):
     job_type: str
     dead_letter: int

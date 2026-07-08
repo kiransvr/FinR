@@ -111,6 +111,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/gate/profile/rollout/policy/check?policy=strict-prod|balanced|conservative` (admin) to enforce policy-based rollout readiness via HTTP (`200` pass, `503` fail)
 - `POST /api/v1/jobs/alerts/incidents/annotate` (admin) to attach operator incident context (scope, summary, details) to the alert timeline
 - `GET /api/v1/jobs/alerts/incidents?limit=50&scope=rollout` (admin) to review recent incident annotations and filter by scope
+- `GET /api/v1/jobs/alerts/gate/decisions?limit=50&decision_type=alerts_gate` (admin) to inspect recent gate check decisions and filter by decision type
 - `POST /api/v1/jobs/pause` and `POST /api/v1/jobs/resume` (admin) to toggle maintenance mode for background processing
 - `POST /api/v1/jobs/resume?require_drained=true` (admin) to enforce that paused workers are drained before resuming
 - `POST /api/v1/jobs/resume-safe?timeout_seconds=30` (admin) to wait for drain and resume in one guarded operation

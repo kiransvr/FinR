@@ -93,6 +93,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/gate/profile/rollout/policy/check?policy=strict-prod|balanced|conservative` for HTTP-native pass/fail enforcement of policy preset decisions.
 - Use `POST /api/v1/jobs/alerts/incidents/annotate` to record manual interventions, escalation notes, or maintenance context with structured details.
 - Use `GET /api/v1/jobs/alerts/incidents` to review incident history during triage and post-incident analysis.
+- Use `GET /api/v1/jobs/alerts/gate/decisions` to audit recent pass/fail outcomes from gate check endpoints and support release forensics.
 - Async submit endpoints deduplicate active jobs by default; use `?force=true` only when you intentionally need parallel reruns.
 - During deploy/restart, worker shutdown is graceful; verify queue resumes by checking `GET /api/v1/jobs/stats` after service is healthy.
 - If async submit returns HTTP 429, inspect queue depth and reduce submission rate or raise `JOB_MAX_QUEUED_JOBS` with controlled rollback plan.
