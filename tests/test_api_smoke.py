@@ -807,6 +807,87 @@ def test_job_alerts_remediation_check_endpoint_returns_503_when_warning_present(
         job_service.get_dead_letter_rate_status = original_get_dead_letter_rate_status
 
 
+def test_job_alerts_remediation_summary_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/summary",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_remediation_summary_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["breached"], bool)
+    assert isinstance(payload["failing_count"], int)
+    assert isinstance(payload["total_actions"], int)
+    assert isinstance(payload["critical_actions"], int)
+    assert isinstance(payload["warning_actions"], int)
+    assert payload["top_priority_signal"] is None or isinstance(payload["top_priority_signal"], str)
+    assert isinstance(payload["deployment_allowed"], bool)
+    assert payload["recommended_status_code"] in {200, 503}
+    assert isinstance(payload["summary"], str)
+
+
+def test_job_alerts_remediation_summary_check_endpoint_returns_200_or_503() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/summary/check",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code in {200, 503}
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["recommended_status_code"] in {200, 503}
+
+
+def test_job_alerts_remediation_policy_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/policy?policy=balanced",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_remediation_policy_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/policy?policy=balanced",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["policy"] == "balanced"
+    assert isinstance(payload["queue_age_threshold_seconds"], float)
+    assert isinstance(payload["dead_letter_window_seconds"], float)
+    assert isinstance(payload["dead_letter_threshold_per_minute"], float)
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["deployment_allowed"], bool)
+    assert payload["recommended_status_code"] in {200, 503}
+
+
+def test_job_alerts_remediation_policy_check_endpoint_returns_200_or_503() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation/policy/check?policy=balanced",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code in {200, 503}
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["policy"] == "balanced"
+
+
 def test_job_alerts_health_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.get(
@@ -2228,6 +2309,48 @@ def test_job_alerts_gate_decisions_endpoint_captures_remediation_check_calls() -
     assert isinstance(payload["records"], list)
     assert payload["records"]
     assert all(record["decision_type"] == "alerts_remediation" for record in payload["records"])
+
+
+def test_job_alerts_gate_decisions_endpoint_captures_remediation_summary_check_calls() -> None:
+    admin_token = _login("admin", "changeme")
+
+    decision_response = client.get(
+        "/api/v1/jobs/alerts/remediation/summary/check",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert decision_response.status_code in {200, 503}
+
+    history_response = client.get(
+        "/api/v1/jobs/alerts/gate/decisions?limit=50&decision_type=alerts_remediation_summary",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert history_response.status_code == 200
+    payload = history_response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["records"], list)
+    assert payload["records"]
+    assert all(record["decision_type"] == "alerts_remediation_summary" for record in payload["records"])
+
+
+def test_job_alerts_gate_decisions_endpoint_captures_remediation_policy_check_calls() -> None:
+    admin_token = _login("admin", "changeme")
+
+    decision_response = client.get(
+        "/api/v1/jobs/alerts/remediation/policy/check?policy=balanced",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert decision_response.status_code in {200, 503}
+
+    history_response = client.get(
+        "/api/v1/jobs/alerts/gate/decisions?limit=50&decision_type=alerts_remediation_policy",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert history_response.status_code == 200
+    payload = history_response.json()
+    assert payload["status"] == "success"
+    assert isinstance(payload["records"], list)
+    assert payload["records"]
+    assert all(record["decision_type"] == "alerts_remediation_policy" for record in payload["records"])
 
 
 def test_job_restart_worker_endpoint_requires_admin_role() -> None:

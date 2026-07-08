@@ -663,6 +663,90 @@ class JobService:
             "summary": summary,
         }
 
+    def get_alert_remediation_summary(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        remediation = cast(
+            dict[str, object],
+            self.get_alert_remediation_actions(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+        actions = cast(list[dict[str, object]], remediation["actions"])
+
+        critical_actions = sum(1 for row in actions if str(row["status"]) == "critical")
+        warning_actions = sum(1 for row in actions if str(row["status"]) == "warning")
+        top_priority_signal: str | None = None
+        if actions:
+            top_priority_signal = str(actions[0]["signal"])
+
+        deployment_allowed = not bool(remediation["breached"])
+        recommended_status_code = 200 if deployment_allowed else 503
+        summary = "Remediation clear for deployment."
+        if actions:
+            summary = f"{len(actions)} remediation action(s) pending before deployment."
+
+        return {
+            "severity": str(remediation["severity"]),
+            "breached": bool(remediation["breached"]),
+            "failing_count": cast(int, remediation["failing_count"]),
+            "total_actions": len(actions),
+            "critical_actions": critical_actions,
+            "warning_actions": warning_actions,
+            "top_priority_signal": top_priority_signal,
+            "deployment_allowed": deployment_allowed,
+            "recommended_status_code": recommended_status_code,
+            "summary": summary,
+        }
+
+    def get_alert_remediation_policy(
+        self,
+        policy: str = "balanced",
+    ) -> dict[str, object]:
+        normalized_policy = policy.strip().lower()
+        policy_map = {
+            "strict-prod": {
+                "queue_age_threshold_seconds": 120.0,
+                "dead_letter_window_seconds": 1800.0,
+                "dead_letter_threshold_per_minute": 0.2,
+            },
+            "balanced": {
+                "queue_age_threshold_seconds": 300.0,
+                "dead_letter_window_seconds": 3600.0,
+                "dead_letter_threshold_per_minute": 1.0,
+            },
+            "conservative": {
+                "queue_age_threshold_seconds": 240.0,
+                "dead_letter_window_seconds": 3600.0,
+                "dead_letter_threshold_per_minute": 0.5,
+            },
+        }
+        if normalized_policy not in policy_map:
+            raise ValueError("policy must be one of: strict-prod, balanced, conservative")
+
+        thresholds = cast(dict[str, float], policy_map[normalized_policy])
+        summary = cast(
+            dict[str, object],
+            self.get_alert_remediation_summary(
+                queue_age_threshold_seconds=float(thresholds["queue_age_threshold_seconds"]),
+                dead_letter_window_seconds=float(thresholds["dead_letter_window_seconds"]),
+                dead_letter_threshold_per_minute=float(thresholds["dead_letter_threshold_per_minute"]),
+            ),
+        )
+
+        return {
+            "policy": normalized_policy,
+            "queue_age_threshold_seconds": float(thresholds["queue_age_threshold_seconds"]),
+            "dead_letter_window_seconds": float(thresholds["dead_letter_window_seconds"]),
+            "dead_letter_threshold_per_minute": float(thresholds["dead_letter_threshold_per_minute"]),
+            **summary,
+        }
+
     def get_alert_gate_status(
         self,
         queue_age_threshold_seconds: float = 300.0,

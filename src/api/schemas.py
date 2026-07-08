@@ -255,6 +255,38 @@ class JobAlertsRemediationResponse(BaseModel):
     summary: str
 
 
+class JobAlertsRemediationSummaryResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    failing_count: int
+    total_actions: int
+    critical_actions: int
+    warning_actions: int
+    top_priority_signal: str | None = None
+    deployment_allowed: bool
+    recommended_status_code: int
+    summary: str
+
+
+class JobAlertsRemediationPolicyResponse(BaseModel):
+    status: str
+    policy: str
+    queue_age_threshold_seconds: float
+    dead_letter_window_seconds: float
+    dead_letter_threshold_per_minute: float
+    severity: str
+    breached: bool
+    failing_count: int
+    total_actions: int
+    critical_actions: int
+    warning_actions: int
+    top_priority_signal: str | None = None
+    deployment_allowed: bool
+    recommended_status_code: int
+    summary: str
+
+
 class JobAlertsHealthResponse(BaseModel):
     status: str
     severity: str

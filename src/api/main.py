@@ -59,6 +59,8 @@ from src.api.schemas import (
     JobAlertsRecommendationsResponse,
     JobAlertRemediationActionRecord,
     JobAlertsRemediationResponse,
+    JobAlertsRemediationSummaryResponse,
+    JobAlertsRemediationPolicyResponse,
     JobAlertsHealthResponse,
     JobAlertsSignalsResponse,
     JobAlertSignalRecord,
@@ -1000,6 +1002,178 @@ def check_job_alert_remediation(
         decision_type="alerts_remediation",
         allowed=allowed,
         status_code=status_code,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/remediation/summary", response_model=JobAlertsRemediationSummaryResponse, tags=["Jobs"])
+def get_job_alert_remediation_summary(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    summary = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_summary(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    return JobAlertsRemediationSummaryResponse(
+        status="success",
+        severity=str(summary["severity"]),
+        breached=bool(summary["breached"]),
+        failing_count=cast(int, summary["failing_count"]),
+        total_actions=cast(int, summary["total_actions"]),
+        critical_actions=cast(int, summary["critical_actions"]),
+        warning_actions=cast(int, summary["warning_actions"]),
+        top_priority_signal=cast(str | None, summary["top_priority_signal"]),
+        deployment_allowed=bool(summary["deployment_allowed"]),
+        recommended_status_code=cast(int, summary["recommended_status_code"]),
+        summary=str(summary["summary"]),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/remediation/summary/check", response_model=JobAlertsRemediationSummaryResponse, tags=["Jobs"])
+def check_job_alert_remediation_summary(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    summary = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_summary(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    payload = JobAlertsRemediationSummaryResponse(
+        status="success",
+        severity=str(summary["severity"]),
+        breached=bool(summary["breached"]),
+        failing_count=cast(int, summary["failing_count"]),
+        total_actions=cast(int, summary["total_actions"]),
+        critical_actions=cast(int, summary["critical_actions"]),
+        warning_actions=cast(int, summary["warning_actions"]),
+        top_priority_signal=cast(str | None, summary["top_priority_signal"]),
+        deployment_allowed=bool(summary["deployment_allowed"]),
+        recommended_status_code=cast(int, summary["recommended_status_code"]),
+        summary=str(summary["summary"]),
+    )
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_remediation_summary",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/remediation/policy", response_model=JobAlertsRemediationPolicyResponse, tags=["Jobs"])
+def get_job_alert_remediation_policy(
+    policy: str = Query(default="balanced", pattern="^(strict-prod|balanced|conservative)$"),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    policy_payload = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_policy(policy=policy),
+    )
+    return JobAlertsRemediationPolicyResponse(
+        status="success",
+        policy=str(policy_payload["policy"]),
+        queue_age_threshold_seconds=cast(float, policy_payload["queue_age_threshold_seconds"]),
+        dead_letter_window_seconds=cast(float, policy_payload["dead_letter_window_seconds"]),
+        dead_letter_threshold_per_minute=cast(float, policy_payload["dead_letter_threshold_per_minute"]),
+        severity=str(policy_payload["severity"]),
+        breached=bool(policy_payload["breached"]),
+        failing_count=cast(int, policy_payload["failing_count"]),
+        total_actions=cast(int, policy_payload["total_actions"]),
+        critical_actions=cast(int, policy_payload["critical_actions"]),
+        warning_actions=cast(int, policy_payload["warning_actions"]),
+        top_priority_signal=cast(str | None, policy_payload["top_priority_signal"]),
+        deployment_allowed=bool(policy_payload["deployment_allowed"]),
+        recommended_status_code=cast(int, policy_payload["recommended_status_code"]),
+        summary=str(policy_payload["summary"]),
+    )
+
+
+@app.get("/api/v1/jobs/alerts/remediation/policy/check", response_model=JobAlertsRemediationPolicyResponse, tags=["Jobs"])
+def check_job_alert_remediation_policy(
+    policy: str = Query(default="balanced", pattern="^(strict-prod|balanced|conservative)$"),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    policy_payload = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_policy(policy=policy),
+    )
+    payload = JobAlertsRemediationPolicyResponse(
+        status="success",
+        policy=str(policy_payload["policy"]),
+        queue_age_threshold_seconds=cast(float, policy_payload["queue_age_threshold_seconds"]),
+        dead_letter_window_seconds=cast(float, policy_payload["dead_letter_window_seconds"]),
+        dead_letter_threshold_per_minute=cast(float, policy_payload["dead_letter_threshold_per_minute"]),
+        severity=str(policy_payload["severity"]),
+        breached=bool(policy_payload["breached"]),
+        failing_count=cast(int, policy_payload["failing_count"]),
+        total_actions=cast(int, policy_payload["total_actions"]),
+        critical_actions=cast(int, policy_payload["critical_actions"]),
+        warning_actions=cast(int, policy_payload["warning_actions"]),
+        top_priority_signal=cast(str | None, policy_payload["top_priority_signal"]),
+        deployment_allowed=bool(policy_payload["deployment_allowed"]),
+        recommended_status_code=cast(int, policy_payload["recommended_status_code"]),
+        summary=str(policy_payload["summary"]),
+    )
+    allowed = payload.deployment_allowed
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_remediation_policy",
+        allowed=allowed,
+        status_code=200 if allowed else 503,
         payload=cast(dict[str, object], payload.model_dump()),
     )
     if allowed:

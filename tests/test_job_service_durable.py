@@ -1007,6 +1007,73 @@ def test_get_alert_remediation_actions_returns_no_action_when_all_ok(tmp_path: P
         service.get_worker_status = original_get_worker_status
 
 
+def test_get_alert_remediation_summary_reports_warning_counts(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 1,
+        "drained": False,
+    }
+
+    submitted = service.submit("signals_job", payload={})
+    try:
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                """
+                UPDATE job_queue
+                SET created_at = '2000-01-01T00:00:00Z'
+                WHERE job_id = ?
+                """,
+                (submitted.job_id,),
+            )
+
+        summary = service.get_alert_remediation_summary(
+            queue_age_threshold_seconds=1,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        assert str(summary["severity"]) == "warning"
+        assert bool(summary["breached"]) is True
+        assert int(summary["total_actions"]) == 1
+        assert int(summary["warning_actions"]) == 1
+        assert int(summary["critical_actions"]) == 0
+        assert str(summary["top_priority_signal"]) == "queue_age"
+        assert bool(summary["deployment_allowed"]) is False
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
+def test_get_alert_remediation_policy_balanced_returns_thresholds(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    payload = service.get_alert_remediation_policy(policy="balanced")
+    assert str(payload["policy"]) == "balanced"
+    assert float(payload["queue_age_threshold_seconds"]) == 300.0
+    assert float(payload["dead_letter_window_seconds"]) == 3600.0
+    assert float(payload["dead_letter_threshold_per_minute"]) == 1.0
+    assert str(payload["severity"]) in {"ok", "warning", "critical"}
+
+
+def test_get_alert_remediation_policy_rejects_invalid_value(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    try:
+        _ = service.get_alert_remediation_policy(policy="legacy")
+        raise AssertionError("Expected ValueError for invalid policy")
+    except ValueError:
+        pass
+
+
 def test_get_alert_gate_status_warning_passes_in_relaxed_mode(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path)

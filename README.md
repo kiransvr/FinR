@@ -90,6 +90,10 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/recommendations` (admin) to get action-oriented operational guidance from alert signals
 - `GET /api/v1/jobs/alerts/remediation` (admin) to return prioritized remediation actions with endpoint hints for incident response execution
 - `GET /api/v1/jobs/alerts/remediation/check` (admin) to enforce remediation-required states via HTTP `200/503` and persist decision history
+- `GET /api/v1/jobs/alerts/remediation/summary` (admin) to return deployment readiness summary counts from current remediation signals
+- `GET /api/v1/jobs/alerts/remediation/summary/check` (admin) to enforce summary readiness as HTTP `200/503` and audit decisions
+- `GET /api/v1/jobs/alerts/remediation/policy?policy=balanced` (admin) to evaluate remediation readiness using preset threshold policies
+- `GET /api/v1/jobs/alerts/remediation/policy/check?policy=balanced` (admin) to enforce policy-based remediation readiness as HTTP `200/503`
 - `GET /api/v1/jobs/alerts/health` (admin) to expose machine-friendly health (`ok/warning/critical`) for automation gates
 - `GET /api/v1/jobs/alerts/gate` (admin) to return deployment gate pass/fail with explicit failure reasons (`?fail_on_warning=true` for strict mode)
 - `GET /api/v1/jobs/alerts/gate/check` (admin) to return HTTP `200` on gate pass or `503` on gate fail for direct CI/CD enforcement

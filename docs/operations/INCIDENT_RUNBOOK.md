@@ -72,6 +72,10 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/recommendations` to retrieve immediate action guidance mapped to current alert signals.
 - Use `GET /api/v1/jobs/alerts/remediation` to retrieve prioritized remediation actions and endpoint hints during incident response.
 - Use `GET /api/v1/jobs/alerts/remediation/check` for CI/CD style enforcement; it returns `503` when remediation is required and records the decision for audit.
+- Use `GET /api/v1/jobs/alerts/remediation/summary` for operator-friendly readiness counts (critical/warning actions and top priority signal).
+- Use `GET /api/v1/jobs/alerts/remediation/summary/check` when release automation should fail while remediation actions are pending.
+- Use `GET /api/v1/jobs/alerts/remediation/policy?policy=balanced` to evaluate remediation readiness under strict, balanced, or conservative threshold presets.
+- Use `GET /api/v1/jobs/alerts/remediation/policy/check?policy=balanced` to enforce policy-based remediation readiness and persist decision records.
 - Use `GET /api/v1/jobs/alerts/health` in deployment/maintenance gates to enforce pass-fail criteria from current alert severity.
 - Use `GET /api/v1/jobs/alerts/gate` for automation-friendly pass/fail with reasons; set `fail_on_warning=true` for stricter release gating.
 - Use `GET /api/v1/jobs/alerts/gate/check` when your pipeline needs HTTP-native gating (`200` pass, `503` fail).
