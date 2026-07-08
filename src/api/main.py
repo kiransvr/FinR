@@ -57,6 +57,8 @@ from src.api.schemas import (
     JobDeadLetterRateResponse,
     JobAlertsSnapshotResponse,
     JobAlertsRecommendationsResponse,
+    JobAlertRemediationActionRecord,
+    JobAlertsRemediationResponse,
     JobAlertsHealthResponse,
     JobAlertsSignalsResponse,
     JobAlertSignalRecord,
@@ -906,6 +908,47 @@ def get_job_alert_recommendations(
         status="success",
         severity=str(signals_status["severity"]),
         recommendations=recommendations,
+    )
+
+
+@app.get("/api/v1/jobs/alerts/remediation", response_model=JobAlertsRemediationResponse, tags=["Jobs"])
+def get_job_alert_remediation(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    payload = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_actions(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    rows = cast(list[dict[str, object]], payload["actions"])
+    return JobAlertsRemediationResponse(
+        status="success",
+        severity=str(payload["severity"]),
+        breached=bool(payload["breached"]),
+        failing_count=cast(int, payload["failing_count"]),
+        actions=[
+            JobAlertRemediationActionRecord(
+                signal=str(item["signal"]),
+                status=str(item["status"]),
+                priority=cast(int, item["priority"]),
+                action=str(item["action"]),
+                endpoint_hint=str(item["endpoint_hint"]),
+            )
+            for item in rows
+        ],
+        summary=str(payload["summary"]),
     )
 
 

@@ -70,6 +70,7 @@ Provide a repeatable response process for production incidents affecting API ava
 - Use `GET /api/v1/jobs/alerts/signals` to inspect each worker/queue/dead-letter signal with explicit status and signal-level details.
 - Use `GET /api/v1/jobs/alerts/failing-signals` to fetch only breached signals with recommended actions for faster triage.
 - Use `GET /api/v1/jobs/alerts/recommendations` to retrieve immediate action guidance mapped to current alert signals.
+- Use `GET /api/v1/jobs/alerts/remediation` to retrieve prioritized remediation actions and endpoint hints during incident response.
 - Use `GET /api/v1/jobs/alerts/health` in deployment/maintenance gates to enforce pass-fail criteria from current alert severity.
 - Use `GET /api/v1/jobs/alerts/gate` for automation-friendly pass/fail with reasons; set `fail_on_warning=true` for stricter release gating.
 - Use `GET /api/v1/jobs/alerts/gate/check` when your pipeline needs HTTP-native gating (`200` pass, `503` fail).

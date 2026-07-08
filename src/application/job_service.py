@@ -612,6 +612,57 @@ class JobService:
             "signals": failing,
         }
 
+    def get_alert_remediation_actions(
+        self,
+        queue_age_threshold_seconds: float = 300.0,
+        dead_letter_window_seconds: float = 3600.0,
+        dead_letter_threshold_per_minute: float = 1.0,
+    ) -> dict[str, object]:
+        failing = cast(
+            dict[str, object],
+            self.get_failing_alert_signals(
+                queue_age_threshold_seconds=queue_age_threshold_seconds,
+                dead_letter_window_seconds=dead_letter_window_seconds,
+                dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+            ),
+        )
+
+        priority_map = {
+            "worker": 1,
+            "dead_letter_rate": 2,
+            "queue_age": 3,
+        }
+        endpoint_map = {
+            "worker": "POST /api/v1/jobs/ensure-worker-alive; POST /api/v1/jobs/restart-worker",
+            "dead_letter_rate": "GET /api/v1/jobs/dead-letter-recent; POST /api/v1/jobs/requeue-dead-letter?dry_run=true",
+            "queue_age": "GET /api/v1/jobs/queued-oldest; POST /api/v1/jobs/cancel-queued",
+        }
+
+        rows = cast(list[dict[str, object]], failing["signals"])
+        actions = [
+            {
+                "signal": str(item["name"]),
+                "status": str(item["status"]),
+                "priority": priority_map.get(str(item["name"]), 99),
+                "action": str(item["recommendation"]),
+                "endpoint_hint": endpoint_map.get(str(item["name"]), "N/A"),
+            }
+            for item in rows
+        ]
+        actions.sort(key=lambda x: cast(int, x["priority"]))
+
+        summary = "No immediate remediation required."
+        if actions:
+            summary = f"Execute {len(actions)} remediation action(s) in priority order."
+
+        return {
+            "severity": str(failing["severity"]),
+            "breached": bool(failing["breached"]),
+            "failing_count": cast(int, failing["failing_count"]),
+            "actions": actions,
+            "summary": summary,
+        }
+
     def get_alert_gate_status(
         self,
         queue_age_threshold_seconds: float = 300.0,

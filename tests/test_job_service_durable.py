@@ -960,6 +960,53 @@ def test_get_failing_alert_signals_empty_when_all_ok(tmp_path: Path) -> None:
         service.get_worker_status = original_get_worker_status
 
 
+def test_get_alert_remediation_actions_prioritizes_worker_signal(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    actions = service.get_alert_remediation_actions(
+        queue_age_threshold_seconds=300,
+        dead_letter_window_seconds=60,
+        dead_letter_threshold_per_minute=1000,
+    )
+    assert str(actions["severity"]) == "critical"
+    rows = actions["actions"]
+    assert isinstance(rows, list)
+    assert len(rows) >= 1
+    assert str(rows[0]["signal"]) == "worker"
+    assert int(rows[0]["priority"]) == 1
+
+
+def test_get_alert_remediation_actions_returns_no_action_when_all_ok(tmp_path: Path) -> None:
+    db_path = tmp_path / "job_queue.db"
+    service = JobService(db_path=db_path)
+    service.register_handler("signals_job", lambda _: {"ok": True})
+
+    original_get_worker_status = service.get_worker_status
+    service.get_worker_status = lambda: {
+        "worker_alive": True,
+        "paused": False,
+        "running": 0,
+        "queued": 0,
+        "drained": True,
+    }
+    try:
+        actions = service.get_alert_remediation_actions(
+            queue_age_threshold_seconds=300,
+            dead_letter_window_seconds=60,
+            dead_letter_threshold_per_minute=1000,
+        )
+        assert str(actions["severity"]) == "ok"
+        assert bool(actions["breached"]) is False
+        rows = actions["actions"]
+        assert isinstance(rows, list)
+        assert rows == []
+        assert str(actions["summary"]) == "No immediate remediation required."
+    finally:
+        service.get_worker_status = original_get_worker_status
+
+
 def test_get_alert_gate_status_warning_passes_in_relaxed_mode(tmp_path: Path) -> None:
     db_path = tmp_path / "job_queue.db"
     service = JobService(db_path=db_path)

@@ -692,6 +692,50 @@ def test_job_alerts_recommendations_endpoint_returns_shape() -> None:
     assert all(isinstance(item, str) for item in payload["recommendations"])
 
 
+def test_job_alerts_remediation_endpoint_requires_admin_role() -> None:
+    officer_token = _login("field_officer", "officer123")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation",
+        headers={"Authorization": f"Bearer {officer_token}"},
+    )
+    assert response.status_code == 403
+
+
+def test_job_alerts_remediation_endpoint_returns_shape() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert payload["severity"] in {"ok", "warning", "critical"}
+    assert isinstance(payload["breached"], bool)
+    assert isinstance(payload["failing_count"], int)
+    assert isinstance(payload["actions"], list)
+    assert isinstance(payload["summary"], str)
+    for action in payload["actions"]:
+        assert isinstance(action["signal"], str)
+        assert action["status"] in {"ok", "warning", "critical"}
+        assert isinstance(action["priority"], int)
+        assert isinstance(action["action"], str)
+        assert isinstance(action["endpoint_hint"], str)
+
+
+def test_job_alerts_remediation_endpoint_prioritizes_worker_action() -> None:
+    admin_token = _login("admin", "changeme")
+    response = client.get(
+        "/api/v1/jobs/alerts/remediation",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    if payload["actions"]:
+        first = payload["actions"][0]
+        assert first["priority"] <= payload["actions"][-1]["priority"]
+
+
 def test_job_alerts_health_endpoint_requires_admin_role() -> None:
     officer_token = _login("field_officer", "officer123")
     response = client.get(

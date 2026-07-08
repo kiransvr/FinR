@@ -238,6 +238,23 @@ class JobAlertsRecommendationsResponse(BaseModel):
     recommendations: list[str]
 
 
+class JobAlertRemediationActionRecord(BaseModel):
+    signal: str
+    status: str
+    priority: int
+    action: str
+    endpoint_hint: str
+
+
+class JobAlertsRemediationResponse(BaseModel):
+    status: str
+    severity: str
+    breached: bool
+    failing_count: int
+    actions: list[JobAlertRemediationActionRecord]
+    summary: str
+
+
 class JobAlertsHealthResponse(BaseModel):
     status: str
     severity: str

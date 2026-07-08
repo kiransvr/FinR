@@ -88,6 +88,7 @@ Background job endpoints (admin):
 - `GET /api/v1/jobs/alerts/signals` (admin) to inspect worker/queue/dead-letter signals with per-signal status and details
 - `GET /api/v1/jobs/alerts/failing-signals` (admin) to list only breached signals with recommendation text for rapid incident response
 - `GET /api/v1/jobs/alerts/recommendations` (admin) to get action-oriented operational guidance from alert signals
+- `GET /api/v1/jobs/alerts/remediation` (admin) to return prioritized remediation actions with endpoint hints for incident response execution
 - `GET /api/v1/jobs/alerts/health` (admin) to expose machine-friendly health (`ok/warning/critical`) for automation gates
 - `GET /api/v1/jobs/alerts/gate` (admin) to return deployment gate pass/fail with explicit failure reasons (`?fail_on_warning=true` for strict mode)
 - `GET /api/v1/jobs/alerts/gate/check` (admin) to return HTTP `200` on gate pass or `503` on gate fail for direct CI/CD enforcement
