@@ -101,7 +101,9 @@ from src.bootstrap.service_factory import build_risk_service
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+# Resolve project root consistently in local and container runs.
+# For src/api/main.py, parents[2] points to the repository root.
+BASE_DIR = Path(__file__).resolve().parents[2]
 _risk_service = build_risk_service(BASE_DIR)
 _job_service = JobService(
     db_path=Path(os.getenv("JOB_QUEUE_DB_PATH", (BASE_DIR / "outputs" / "job_queue.db").as_posix())),
