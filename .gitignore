@@ -8,6 +8,7 @@ __pycache__/
 models/*.joblib
 outputs/*.csv
 outputs/*.json
+outputs/job_queue.db
 !outputs/.gitkeep
 !models/.gitkeep
 data/processed/*.csv
