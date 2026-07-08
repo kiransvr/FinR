@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loan Default Risk | Collections Intelligence</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #eef2f6;
+      --surface: rgba(255, 255, 255, 0.84);
+      --surface-strong: rgba(255, 255, 255, 0.96);
+      --text: #13202f;
+      --muted: #5e6b78;
+      --accent: #174e56;
+      --accent-2: #c08a48;
+      --line: rgba(18, 28, 42, 0.08);
+      --shadow: 0 26px 70px rgba(17, 25, 35, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(192, 138, 72, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(23, 78, 86, 0.18), transparent 24%),
+        linear-gradient(180deg, #f8fbfe 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1220px;
+      margin: 0 auto;
+      padding: 28px 20px 72px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 18px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.8rem;
+      text-decoration: none;
+      color: inherit;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #1d6670 55%, var(--accent-2));
+      box-shadow: 0 16px 28px rgba(23, 78, 86, 0.28);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.55);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.7rem 1rem;
+      font-weight: 700;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+
+    .nav-links a:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.8); }
+
+    .hero,
+    .card,
+    .stat,
+    .callout {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .hero {
+      padding: 36px;
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.52rem 0.8rem;
+      border-radius: 999px;
+      background: rgba(23, 78, 86, 0.08);
+      border: 1px solid rgba(23, 78, 86, 0.14);
+      color: var(--accent);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { margin: 0; line-height: 1.05; letter-spacing: -0.04em; }
+    h1 { font-size: clamp(2.2rem, 5vw, 4.4rem); max-width: 12ch; margin-top: 1rem; }
+    h2 { font-size: clamp(1.35rem, 3vw, 2rem); }
+    h3 { font-size: 1.05rem; }
+    p {
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 1rem;
+    }
+
+    .copy {
+      margin-top: 1rem;
+      max-width: 65ch;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-top: 1.3rem;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.9rem 1.25rem;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 800;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .button:hover { transform: translateY(-2px); }
+    .button.primary {
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #1d6670 55%, var(--accent-2));
+      box-shadow: 0 18px 30px rgba(23, 78, 86, 0.26);
+    }
+    .button.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid var(--line);
+    }
+
+    .hero-panel {
+      background: linear-gradient(180deg, rgba(18, 31, 43, 0.98), rgba(28, 42, 58, 0.96));
+      color: white;
+      border-radius: 24px;
+      padding: 1.25rem;
+      box-shadow: 0 18px 40px rgba(17, 25, 35, 0.2);
+      display: grid;
+      gap: 1rem;
+      align-content: start;
+    }
+
+    .panel-note {
+      color: rgba(255, 255, 255, 0.72);
+      font-size: 0.9rem;
+    }
+
+    .panel-box {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+      padding: 0.95rem 1rem;
+    }
+
+    .panel-box strong,
+    .panel-box span {
+      display: block;
+    }
+
+    .panel-box strong { margin-top: 0.3rem; font-size: 1.05rem; }
+
+    .panel-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .panel-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.45rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .section {
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      padding: 22px;
+      grid-column: span 6;
+    }
+
+    .card.full { grid-column: span 12; }
+    .card.third { grid-column: span 4; }
+
+    ul {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .stats {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat {
+      padding: 18px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 800;
+    }
+
+    .stat .value {
+      margin-top: 0.3rem;
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+
+    .stat .hint {
+      margin-top: 0.25rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .workflow {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .step {
+      padding: 18px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+    }
+
+    .step .index {
+      display: inline-flex;
+      width: 32px;
+      height: 32px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      background: rgba(23, 78, 86, 0.1);
+      color: var(--accent);
+      font-weight: 900;
+      margin-bottom: 0.75rem;
+    }
+
+    .callout {
+      padding: 20px;
+      margin-top: 18px;
+    }
+
+    .footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      text-align: center;
+    }
+
+    @media (max-width: 1050px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .stats,
+      .workflow {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .wrap { padding: 16px 14px 60px; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+      .hero,
+      .card,
+      .callout { border-radius: 22px; }
+      .hero { padding: 22px; }
+      .section,
+      .stats,
+      .workflow { grid-template-columns: 1fr; }
+      .card,
+      .card.third,
+      .card.full { grid-column: span 12; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="topbar">
+      <a class="brand" href="#home">
+        <span class="mark"></span>
+        <span>Loan Default Risk</span>
+      </a>
+      <div class="nav-links">
+        <a href="#capabilities">Capabilities</a>
+        <a href="#workflow">Workflow</a>
+        <a href="#links">Launch</a>
+      </div>
+    </div>
+
+    <section class="hero" id="home">
+      <div>
+        <span class="tag">Collections Intelligence</span>
+        <h1>Professional risk scoring for MFIs and loan officers</h1>
+        <p class="copy">
+          This application helps loan officers upload portfolio data, score future default risk,
+          and turn the results into actionable visit plans, KPI summaries, and feedback templates.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="http://localhost:8501" target="_blank" rel="noreferrer">Open dashboard</a>
+          <a class="button secondary" href="http://localhost:8001/docs" target="_blank" rel="noreferrer">Open API docs</a>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Upload</div>
+            <div class="value">CSV / XLSX</div>
+            <div class="hint">Replace the active portfolio from the dashboard</div>
+          </div>
+          <div class="stat">
+            <div class="label">Scoring</div>
+            <div class="value">Rules + ML</div>
+            <div class="hint">Rule-based fallback with optional model training</div>
+          </div>
+          <div class="stat">
+            <div class="label">Outputs</div>
+            <div class="value">4+</div>
+            <div class="hint">Risk tables, visit plans, KPIs, and templates</div>
+          </div>
+          <div class="stat">
+            <div class="label">Focus</div>
+            <div class="value">Collections</div>
+            <div class="hint">Practical action lists for loan officers</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="hero-panel">
+        <div>
+          <div class="panel-note">Active development input</div>
+          <strong>Loan Accounts-Active.csv</strong>
+        </div>
+        <div class="panel-box">
+          <span class="panel-note">What the dashboard does</span>
+          <strong>Upload, validate, score, and review</strong>
+        </div>
+        <div class="panel-box">
+          <span class="panel-note">Operational outputs</span>
+          <strong>Risk list, visit plan, officer KPIs</strong>
+        </div>
+        <div class="panel-badges">
+          <span class="panel-badge">Professional UI</span>
+          <span class="panel-badge">MFI use case</span>
+          <span class="panel-badge">FastAPI backend</span>
+        </div>
+      </aside>
+    </section>
+
+    <section class="section" id="capabilities">
+      <article class="card">
+        <h2>What it does</h2>
+        <ul>
+          <li>Loads portfolio data and checks required columns.</li>
+          <li>Computes arrear, collateral, and delinquency features.</li>
+          <li>Predicts which currently regular accounts are likely to default later.</li>
+          <li>Generates collections outputs for officers and supervisors.</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Key outputs</h2>
+        <ul>
+          <li>Scored accounts ranked by risk</li>
+          <li>Top risky accounts for immediate attention</li>
+          <li>Daily visit plan for officers</li>
+          <li>Officer KPI summaries and feedback template</li>
+        </ul>
+      </article>
+
+      <article class="card full" id="workflow">
+        <h2>Workflow</h2>
+        <div class="workflow">
+          <div class="step">
+            <div class="index">1</div>
+            <h3>Upload data</h3>
+            <p>Loan officers upload a portfolio file from the dashboard.</p>
+          </div>
+          <div class="step">
+            <div class="index">2</div>
+            <h3>Validate fields</h3>
+            <p>The system checks whether the required columns are present.</p>
+          </div>
+          <div class="step">
+            <div class="index">3</div>
+            <h3>Run scoring</h3>
+            <p>Rules and ML create future default risk outputs.</p>
+          </div>
+          <div class="step">
+            <div class="index">4</div>
+            <h3>Act on results</h3>
+            <p>Officers use visit plans and KPIs to prioritize collections.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="callout" id="links">
+      <h2>Launch points</h2>
+      <p>
+        Use the dashboard for day-to-day operations and the API docs when you want to connect the
+        scoring engine to another system.
+      </p>
+    </section>
+
+    <p class="footer">
+      This landing page now matches the actual collections intelligence product instead of an unrelated demo.
+    </p>
+  </main>
+</body>
+</html>

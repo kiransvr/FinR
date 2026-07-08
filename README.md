@@ -60,6 +60,8 @@ Container entry points:
 - `docker build -t loan-default-risk:local .`
 - `docker run --rm -p 8001:8001 --env APP_ENV=production --env SECRET_KEY=<secret> --env ADMIN_PASSWORD=<password> loan-default-risk:local`
 - `docker compose -f docker-compose.release.yml up -d api-blue --build`
+- `render.yaml` defines Render API and dashboard services for production deployment
+- `.env.production.example` provides a copy/paste baseline for production environment variables
 
 Background job endpoints (admin):
 
@@ -172,6 +174,13 @@ Operational docs:
 - `docs/operations/INCIDENT_RUNBOOK.md`
 - `docs/operations/RELEASE_CHECKLIST.md`
 - `docs/operations/DEPLOYMENT_STRATEGY.md`
+- `docs/operations/PRODUCTION_PROVIDER_RUNBOOK.md`
+
+Deployment configs:
+
+- `render.yaml`
+- `.env.production.example`
+- `site/vercel.json`
 
 API governance docs:
 

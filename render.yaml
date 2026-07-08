@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: loan-default-risk-api
+    runtime: docker
+    rootDir: FinR-clean
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /api/v1/health/live
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: OUTPUT_STORE_ADAPTER
+        value: db
+      - key: ENABLE_DEMO_OFFICER_USER
+        value: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: SECRET_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: AUTH_KEY_VERSION
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: DB_OUTPUT_DATABASE_URL
+        sync: false
+      - key: JOB_MAX_ATTEMPTS
+        value: "3"
+      - key: JOB_RETRY_BACKOFF_SECONDS
+        value: "0.2"
+      - key: JOB_TIMEOUT_SECONDS
+        value: "60"
+      - key: JOB_RUNNING_STALE_SECONDS
+        value: "300"
+      - key: JOB_MAX_QUEUED_JOBS
+        value: "500"
+
+  - type: web
+    name: loan-default-risk-dashboard
+    runtime: python
+    rootDir: FinR-clean
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    plan: starter
+    autoDeploy: false
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: OUTPUT_STORE_ADAPTER
+        value: db
+      - key: ENABLE_DEMO_OFFICER_USER
+        value: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: SECRET_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: AUTH_KEY_VERSION
+        sync: false
+      - key: DB_OUTPUT_DATABASE_URL
+        sync: false
