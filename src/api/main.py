@@ -952,6 +952,65 @@ def get_job_alert_remediation(
     )
 
 
+@app.get("/api/v1/jobs/alerts/remediation/check", response_model=JobAlertsRemediationResponse, tags=["Jobs"])
+def check_job_alert_remediation(
+    queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
+    dead_letter_window_seconds: float = Query(default=3600.0, ge=1.0),
+    dead_letter_threshold_per_minute: float = Query(default=1.0, ge=0.0),
+    current_user: TokenData = Depends(get_current_user),
+    jobs: JobService = Depends(get_job_service),
+):
+    try:
+        require_role(current_user.role, "admin")
+    except AuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    payload_data = cast(
+        dict[str, object],
+        jobs.get_alert_remediation_actions(
+            queue_age_threshold_seconds=queue_age_threshold_seconds,
+            dead_letter_window_seconds=dead_letter_window_seconds,
+            dead_letter_threshold_per_minute=dead_letter_threshold_per_minute,
+        ),
+    )
+    rows = cast(list[dict[str, object]], payload_data["actions"])
+    payload = JobAlertsRemediationResponse(
+        status="success",
+        severity=str(payload_data["severity"]),
+        breached=bool(payload_data["breached"]),
+        failing_count=cast(int, payload_data["failing_count"]),
+        actions=[
+            JobAlertRemediationActionRecord(
+                signal=str(item["signal"]),
+                status=str(item["status"]),
+                priority=cast(int, item["priority"]),
+                action=str(item["action"]),
+                endpoint_hint=str(item["endpoint_hint"]),
+            )
+            for item in rows
+        ],
+        summary=str(payload_data["summary"]),
+    )
+
+    allowed = not payload.breached
+    status_code = 200 if allowed else 503
+    _record_gate_decision(
+        jobs=jobs,
+        current_user=current_user,
+        decision_type="alerts_remediation",
+        allowed=allowed,
+        status_code=status_code,
+        payload=cast(dict[str, object], payload.model_dump()),
+    )
+    if allowed:
+        return payload
+
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=payload.model_dump(),
+    )
+
+
 @app.get("/api/v1/jobs/alerts/health", response_model=JobAlertsHealthResponse, tags=["Jobs"])
 def get_job_alerts_health(
     queue_age_threshold_seconds: float = Query(default=300.0, ge=0.0),
