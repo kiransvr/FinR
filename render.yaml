@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: loan-default-risk-api
+    name: finr-api
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: starter
@@ -37,7 +37,7 @@ services:
         value: "500"
 
   - type: web
-    name: loan-default-risk-dashboard
+    name: finr-dashboard
     runtime: python
     pythonVersion: "3.12"
     buildCommand: pip install -r requirements.txt

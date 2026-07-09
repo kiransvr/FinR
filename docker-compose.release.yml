@@ -3,8 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: loan-default-risk:blue
-    container_name: loan-default-risk-blue
+    image: finr:blue
+    container_name: finr-blue
     environment:
       APP_ENV: production
       OUTPUT_STORE_ADAPTER: db
@@ -26,8 +26,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: loan-default-risk:green
-    container_name: loan-default-risk-green
+    image: finr:green
+    container_name: finr-green
     environment:
       APP_ENV: production
       OUTPUT_STORE_ADAPTER: db
