@@ -2,7 +2,6 @@ services:
   - type: web
     name: loan-default-risk-api
     runtime: docker
-    rootDir: FinR-clean
     dockerfilePath: ./Dockerfile
     plan: starter
     healthCheckPath: /api/v1/health/live
@@ -40,7 +39,7 @@ services:
   - type: web
     name: loan-default-risk-dashboard
     runtime: python
-    rootDir: FinR-clean
+    pythonVersion: "3.12"
     buildCommand: pip install -r requirements.txt
     startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
     plan: starter
