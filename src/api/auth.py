@@ -31,7 +31,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 AUTH_KEY_VERSION = os.getenv("AUTH_KEY_VERSION", "v1")
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 # ── Demo user store (replace with DB in production) ───────────────────────────
 def _load_plain_users() -> dict[str, dict]:
@@ -118,8 +118,14 @@ def is_token_revoked(token_id: str) -> bool:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> TokenData:
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     token = credentials.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

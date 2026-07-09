@@ -72,7 +72,7 @@ class DbOutputRepository(OutputStore):
             df.to_sql(table_name, conn, if_exists="replace", index=False)
 
     def _canonical_feedback(self, record: dict) -> dict:
-        now_ts = pd.Timestamp.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        now_ts = pd.Timestamp.now('UTC').strftime("%Y-%m-%dT%H:%M:%SZ")
         canonical = {
             "AsOfDate": str(record.get("AsOfDate", pd.Timestamp.today().strftime("%Y-%m-%d"))),
             "OfficerId": str(record.get("OfficerId", "")).strip(),

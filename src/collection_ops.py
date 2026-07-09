@@ -56,7 +56,7 @@ def load_feedback_log(path: Path) -> pd.DataFrame:
 
 
 def append_feedback_record(path: Path, record: dict) -> tuple[pd.DataFrame, dict]:
-    now_ts = pd.Timestamp.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_ts = pd.Timestamp.now('UTC').strftime("%Y-%m-%dT%H:%M:%SZ")
     canonical = {
         "AsOfDate": str(record.get("AsOfDate", pd.Timestamp.today().strftime("%Y-%m-%d"))),
         "OfficerId": str(record.get("OfficerId", "")).strip(),
