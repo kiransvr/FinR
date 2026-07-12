@@ -11,6 +11,3 @@ __pycache__/
 .env
 .env.*
 *.db
-outputs/*.csv
-outputs/*.json
-models/*.joblib

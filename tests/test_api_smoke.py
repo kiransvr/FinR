@@ -17,6 +17,16 @@ def test_health_endpoint_returns_ok_payload() -> None:
     assert "pipeline_outputs_available" in payload
 
 
+def test_root_endpoint_returns_service_status() -> None:
+    response = client.get("/")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["service"] == "Loan Default Risk API"
+    assert payload["docs"] == "/docs"
+    assert payload["health"] == "/api/v1/health/live"
+
+
 def test_liveness_and_readiness_endpoints() -> None:
     live_response = client.get("/api/v1/health/live")
     assert live_response.status_code == 200

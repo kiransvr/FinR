@@ -186,6 +186,16 @@ app.add_middleware(
 install_observability_middleware(app)
 
 
+@app.get("/", include_in_schema=False)
+def root_status():
+    return {
+        "status": "ok",
+        "service": "Loan Default Risk API",
+        "docs": "/docs",
+        "health": "/api/v1/health/live",
+    }
+
+
 def _build_error_response(
     status_code: int,
     code: str,
