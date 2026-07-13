@@ -33,9 +33,9 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     cleaned = cleaned.drop_duplicates()
 
     for col in cleaned.columns:
-        if cleaned[col].dtype == object:
-            cleaned[col] = cleaned[col].fillna("Unknown").astype(str).str.strip()
-        else:
+        if pd.api.types.is_numeric_dtype(cleaned[col]):
             cleaned[col] = cleaned[col].fillna(cleaned[col].median())
+        else:
+            cleaned[col] = cleaned[col].fillna("Unknown").astype(str).str.strip()
 
     return cleaned

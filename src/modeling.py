@@ -84,8 +84,8 @@ def train_model(df: pd.DataFrame, model_path: Path, metrics_path: Path) -> Tuple
         X, y, test_size=0.3, random_state=42, stratify=y
     )
 
-    numeric_cols = [c for c in FEATURE_COLUMNS if X[c].dtype != "object"]
-    categorical_cols = [c for c in FEATURE_COLUMNS if X[c].dtype == "object"]
+    numeric_cols = [c for c in FEATURE_COLUMNS if pd.api.types.is_numeric_dtype(X[c])]
+    categorical_cols = [c for c in FEATURE_COLUMNS if not pd.api.types.is_numeric_dtype(X[c])]
 
     pipe = _build_pipeline(numeric_cols, categorical_cols)
     pipe.fit(X_train, y_train)
